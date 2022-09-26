@@ -1,4 +1,5 @@
 import torch
+import networkx as nx
 
 # type_dict = {"hidden": 0, "input": 1, "output": 2}
 type_dict = {"hidden": [1, 0, 0], "input": [0, 1, 0], "output": [0, 0, 1]}
@@ -33,9 +34,37 @@ def get_type(x, hidden_dim: int = 1):
     """
     return x[:,hidden_dim:]#.unsqueeze(-1)
 
-def remove_type(x, hidden_dim: int = 1):
-    pass
-    # """
-    # Remove type from x
-    # """
-    # return x[:,0].unsqueeze(-1), x[:,1].unsqueeze(-1)
+    
+def build_edges(n_inputs: int, n_outputs: int, height: int, width: int):
+    """
+    Builds edges like 2d_grid_graph
+    """
+    #hidden neurons
+    edge_list = list(nx.grid_2d_graph(height, width).edges())
+    node_list = list(nx.grid_2d_graph(height, width).nodes())
+
+    #replace each element of edge_list with its index in node_list
+    for i in range(len(edge_list)):
+        edge_list[i] = (node_list.index(edge_list[i][0]), node_list.index(edge_list[i][1]))
+        
+    edges = torch.tensor(edge_list)
+    
+    #input neurons
+    input_edges = torch.tensor([
+        [
+            [x, (height*width) + y] for x in range(width)
+        ] for y in range(n_inputs)
+    ]).view(-1, 2)
+
+    #output neurons
+    output_edges = torch.tensor([
+        [
+            [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
+        ] for y in range(n_outputs)
+    ]).view(-1, 2)
+
+    #merge edges and input_edges
+    edges = torch.cat((edges, input_edges, output_edges), dim=0).transpose(0,1)
+    edges =  torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0) #?
+    
+    return edges
