@@ -68,3 +68,17 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int):
     edges =  torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0) #?
     
     return edges
+
+
+
+def run_rule(data_x, update_rule, n_steps = 5):
+    x = update_rule.initial
+    update_rule.reset()
+    # edge_index = data.edge_index.long().clone()
+    for i in range(n_steps):
+        x = update_rule(x, data_x.float())
+    
+        network_output = update_rule.get_output(x).detach()
+        print(network_output)
+    return network_output
+    
