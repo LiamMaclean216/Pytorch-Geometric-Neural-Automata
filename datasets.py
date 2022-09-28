@@ -87,10 +87,10 @@ class MetaDataset():
         
     def iterate(self):
         """
-        returns a generator that gives an index
+        returns a generator that gives an shuffled index
         """
-        yield from range(len(self.datasets))
-        
+        return iter(torch.randperm(len(self.datasets)))
+
     def get_set(self, n):
         return DataLoader(self.datasets[n] , batch_size=1, shuffle=True)
     
