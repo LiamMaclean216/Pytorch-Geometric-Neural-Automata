@@ -56,7 +56,7 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.data)    
 
 n = 7
-drop = 3
+drop = None#3
 class TranslateDataset(Dataset):
     def __init__(self) -> None:
         
@@ -82,7 +82,8 @@ class MetaDataset():
     Dataset of datasets
     """
     def __init__(self):
-        self.datasets = [dataset() for dataset in [TranslateDataset, TranslateDataset2]]
+        # self.datasets = [dataset() for dataset in [TranslateDataset, TranslateDataset2]]
+        self.datasets = [dataset() for dataset in [TranslateDataset]]
         
     def iterate(self):
         """
