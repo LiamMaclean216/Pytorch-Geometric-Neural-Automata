@@ -55,9 +55,8 @@ class Dataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)    
 
-n = 4
+n = 7
 drop = 3
-
 class TranslateDataset(Dataset):
     def __init__(self) -> None:
         
@@ -93,3 +92,6 @@ class MetaDataset():
         
     def get_set(self, n):
         return DataLoader(self.datasets[n] , batch_size=1, shuffle=True)
+    
+    def get_set_size(self):
+        return len(self.datasets[0])
