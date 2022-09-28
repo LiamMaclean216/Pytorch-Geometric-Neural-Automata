@@ -76,14 +76,46 @@ class TranslateDataset2(Dataset):
     
         super().__init__(one_hot(arr, n), one_hot((arr-1)%n, n))
         
+
+class TimeDataset1(torch.utils.data.Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[0,1], [0,1], [0,0]])
+        self.target = torch.tensor([[0,0,0], [0,0,0],[1,0,0]])
+        
+    def __getitem__(self, index):
+        return self.data[index], self.target[index]
+    def __len__(self):
+        return len(self.data)
+     
+class TimeDataset2(torch.utils.data.Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[1,0], [1,0], [0,0]])
+        self.target = torch.tensor([[0,0,0], [0,0,0],[0,1,0]])
+        
+    def __getitem__(self, index):
+        return self.data[index], self.target[index]
+    def __len__(self):
+        return len(self.data)
     
+class TimeDataset3(torch.utils.data.Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[1,0], [0,1], [0,0]])
+        self.target = torch.tensor([[0,0,0], [0,0,0],[0,0,1]])
+        
+    def __getitem__(self, index):
+        return self.data[index], self.target[index]
+    def __len__(self):
+        return len(self.data)
+     
 class MetaDataset():
     """
     Dataset of datasets
     """
     def __init__(self):
         # self.datasets = [dataset() for dataset in [TranslateDataset, TranslateDataset2]]
-        self.datasets = [dataset() for dataset in [TranslateDataset]]
+        # self.datasets = [dataset() for dataset in [TranslateDataset]]
+        self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3]]
+        
         
     def iterate(self):
         """
@@ -92,7 +124,7 @@ class MetaDataset():
         return iter(torch.randperm(len(self.datasets)))
 
     def get_set(self, n):
-        return DataLoader(self.datasets[n] , batch_size=1, shuffle=True)
+        return DataLoader(self.datasets[n] , batch_size=1, shuffle=False)
     
     def get_set_size(self):
         return len(self.datasets[0])
