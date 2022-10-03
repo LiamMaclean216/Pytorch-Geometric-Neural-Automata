@@ -1,5 +1,6 @@
 import torch
 import networkx as nx
+from torch_geometric.utils import grid
 
 # type_dict = {"hidden": 0, "input": 1, "output": 2}
 type_dict = {"hidden": [1, 0, 0], "input": [0, 1, 0], "output": [0, 0, 1]}
@@ -35,19 +36,22 @@ def get_type(x, hidden_dim: int = 1):
     return x[:,hidden_dim:]#.unsqueeze(-1)
 
     
-def build_edges(n_inputs: int, n_outputs: int, height: int, width: int):
+def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="dense"):
     """
     Builds edges like 2d_grid_graph
     """
     #hidden neurons
-    edge_list = list(nx.grid_2d_graph(height, width).edges())
-    node_list = list(nx.grid_2d_graph(height, width).nodes())
+    if mode == "grid":
+        edge_list = list(nx.grid_2d_graph(height, width).edges())
+        node_list = list(nx.grid_2d_graph(height, width).nodes())
 
-    #replace each element of edge_list with its index in node_list
-    for i in range(len(edge_list)):
-        edge_list[i] = (node_list.index(edge_list[i][0]), node_list.index(edge_list[i][1]))
-        
-    edges = torch.tensor(edge_list)
+        #replace each element of edge_list with its index in node_list
+        for i in range(len(edge_list)):
+            edge_list[i] = (node_list.index(edge_list[i][0]), node_list.index(edge_list[i][1]))
+            
+        edges = torch.tensor(edge_list)
+    elif mode == "dense":
+        edges = grid(height, width)[0].transpose(0,1)
     
     #input neurons
     input_edges = torch.tensor([

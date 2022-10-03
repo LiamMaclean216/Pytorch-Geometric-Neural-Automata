@@ -82,7 +82,7 @@ class UpdateRule(torch.nn.Module):
         self.width = width
         self.height = height
         
-        # # Build initial state
+        # Build initial state
         n_nodes = height*width + self.n_inputs + self.n_outputs
         # self.initial = nn.parameter.Parameter(torch.zeros([n_nodes, self.total_hidden_dim]), requires_grad=True)
         
@@ -107,9 +107,15 @@ class UpdateRule(torch.nn.Module):
             input_data = problem_data_x.float().unsqueeze(-1).to(cuda_device)
             
             
+            # x[
+            # (self.height*self.width):((self.height*self.width)+self.n_inputs), :self.input_vector_size
+            # ] = self.input_vectorizer(input_data).squeeze(-1)
+            
             x[
-            (self.height*self.width):((self.height*self.width)+self.n_inputs), :self.input_vector_size
+                -(self.n_inputs+self.n_outputs):-self.n_outputs, :self.input_vector_size
             ] = self.input_vectorizer(input_data).squeeze(-1)
+            
+            
             
             # x = x.unsqueeze(-1).repeat(1, 1, n_steps)
             
