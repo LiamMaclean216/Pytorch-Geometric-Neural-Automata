@@ -114,8 +114,8 @@ class MetaDataset():
     def __init__(self):
         # self.datasets = [dataset() for dataset in [TranslateDataset, TranslateDataset2]]
         # self.datasets = [dataset() for dataset in [TranslateDataset]]
-        # self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3]]
-        self.datasets = [SelfOrganizeTest()]
+        self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3]]
+        # self.datasets = [SelfOrganizeTest()]
         
         
     def iterate(self):
@@ -125,7 +125,7 @@ class MetaDataset():
         return iter(torch.randperm(len(self.datasets)))
 
     def get_set(self, n):
-        return DataLoader(self.datasets[n] , batch_size=1, shuffle=True)
+        return DataLoader(self.datasets[n] , batch_size=1, shuffle=False)
     
     def get_set_size(self):
         return len(self.datasets[0])
