@@ -77,35 +77,48 @@ class TranslateDataset2(Dataset):
         super().__init__(one_hot(arr, n), one_hot((arr-1)%n, n))
         
 
-class TimeDataset1(torch.utils.data.Dataset):
+class TimeDataset1(Dataset):
     def __init__(self):
         self.data = torch.tensor([[0,1], [0,1], [0,0]])
-        self.target = torch.tensor([[0,0,0], [0,0,0],[1,0,0]])
-        
-    def __getitem__(self, index):
-        return self.data[index], self.target[index]
-    def __len__(self):
-        return len(self.data)
+        self.target = torch.tensor([[0,0,0,0], [0,0,0,0],[1,0,0,0]])
      
-class TimeDataset2(torch.utils.data.Dataset):
+class TimeDataset2(Dataset):
     def __init__(self):
         self.data = torch.tensor([[1,0], [1,0], [0,0]])
-        self.target = torch.tensor([[0,0,0], [0,0,0],[0,1,0]])
+        self.target = torch.tensor([[0,0,0,0], [0,0,0,0],[0,1,0,0]])
         
-    def __getitem__(self, index):
-        return self.data[index], self.target[index]
-    def __len__(self):
-        return len(self.data)
     
-class TimeDataset3(torch.utils.data.Dataset):
+class TimeDataset3(Dataset):
     def __init__(self):
         self.data = torch.tensor([[1,0], [0,1], [0,0]])
-        self.target = torch.tensor([[0,0,0], [0,0,0],[0,0,1]])
+        self.target = torch.tensor([[0,0,0,0], [0,0,0,0],[0,0,1,0]])
         
-    def __getitem__(self, index):
-        return self.data[index], self.target[index]
-    def __len__(self):
-        return len(self.data)
+class TimeDataset4(Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[1,1], [0,1], [0,0]])
+        self.target = torch.tensor([[0,0,0,0], [0,0,0,0],[0,0,0,1]])
+        
+     
+# class FTDataset1(Dataset):
+#     def __init__(self):
+#         self.data = torch.tensor([[1,0,0,0], [0,0,0,0]])
+#         self.target = torch.tensor([[0,0], [0,0]])
+     
+class FTDataset2(Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[0,1,0,0], [0,0,0,0]])
+        self.target = torch.tensor([[0,0], [1,0]]) 
+                                   
+class FTDataset3(Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[0,0,1,0], [0,0,0,0]])
+        self.target = torch.tensor([[0,0], [0,1]])
+        
+# class FTDataset4(Dataset):
+    # def __init__(self):
+    #     self.data = torch.tensor([[0,0,0,1], [0,0,0,0]])
+    #     self.target = torch.tensor([[0,0], [1,1]])
+                            
      
 class MetaDataset():
     """
@@ -114,9 +127,8 @@ class MetaDataset():
     def __init__(self):
         # self.datasets = [dataset() for dataset in [TranslateDataset, TranslateDataset2]]
         # self.datasets = [dataset() for dataset in [TranslateDataset]]
-        self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3]]
-        # self.datasets = [SelfOrganizeTest()]
-        
+        self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3, TimeDataset4]]
+        # self.datasets = [dataset() for dataset in [FTDataset2, FTDataset3]]
         
     def iterate(self):
         """

@@ -1,6 +1,6 @@
 import torch
 import networkx as nx
-from torch_geometric.utils import grid
+from torch_geometric.utils import grid, remove_self_loops
 
 # type_dict = {"hidden": 0, "input": 1, "output": 2}
 type_dict = {"hidden": [1, 0, 0], "input": [0, 1, 0], "output": [0, 0, 1]}
@@ -53,6 +53,7 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     elif mode == "dense":
         edges = grid(height, width)[0].transpose(0,1)
     
+    
     #input neurons
     input_edges = torch.tensor([
         [
@@ -69,7 +70,11 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
 
     #merge edges and input_edges
     edges = torch.cat((edges, input_edges, output_edges), dim=0).transpose(0,1)
+    
     edges =  torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0) #?
+    edges = remove_self_loops(edges)[0]
+    
+    
     
     return edges
 
