@@ -47,10 +47,10 @@ class UpdateRule(torch.nn.Module):
         
         # self.input_vectorizer = nn.Linear(n_inputs, self.total_hidden_dim, bias=True)
         self.input_vector_size = 2
-        self.input_vectorizer = nn.Linear(1, self.input_vector_size, bias=True)
+        self.input_vectorizer = nn.Linear(1, self.input_vector_size)
         
         # Vectorizes training targets
-        self.reverse_output_vectorizer = nn.Linear(n_outputs, self.total_hidden_dim)
+        self.reverse_output_vectorizer = nn.Linear(1, self.input_vector_size)
         self.output_vectorizer = nn.Linear(hidden_dim, 1)
         
         heads = 1
@@ -112,14 +112,20 @@ class UpdateRule(torch.nn.Module):
 
         return x
             
-    
+    def vectorize_output(self, x, input_data):
+        x[
+                -self.n_outputs:, :self.input_vector_size
+            ] = self.reverse_output_vectorizer(input_data).squeeze(-1)
+
+        return x
     
     def forward(self, x, n_steps, data, plug_output_data = False, return_all = True, edge_attr = None):
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
-            output_data = None#torch.zeros_like(problem_data_y.float())
-            # if idx == meta_set.get_set_size() - 1:
-            #     output_data = None#problem_data_y.float()
-            
+            if idx != len(data) - 1:
+                x = self.vectorize_output(x, problem_data_y.float().unsqueeze(-1).to(cuda_device))
+            # else:
+            #     print("no output")
+            # print(problem_data_x, problem_data_y)
             
             # problem_data_x = problem_data_x.repeat(n_steps, 1)#.unsqueeze(0).transpose(1,2)
             # print(problem_data_x.shape)
@@ -130,9 +136,9 @@ class UpdateRule(torch.nn.Module):
             
             
             for _ in range(n_steps):
-                x = self.step(x, problem_data_x.float(), output_data, edge_attr=edge_attr)
+                x = self.step(x, edge_attr=edge_attr)
                 
-            
+        # print("#################")    
         network_output = self.get_output(x)
         loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float().squeeze(0))
         
@@ -151,15 +157,11 @@ class UpdateRule(torch.nn.Module):
         return x
         
     
-    def step(self, x, input_data, output_data = None, edge_attr = None):
+    def step(self, x, edge_attr = None):
         skip = x
         
         # x = self.relu(x)
         
-        if output_data is not None:
-            mask = torch.zeros(x.shape)
-            mask[-self.n_outputs:, :self.hidden_dim] = 1
-            x = x+((self.reverse_output_vectorizer(output_data)-x) * mask)
             
         # print(edge_attr.shape, self.edge_index.shape)
         
