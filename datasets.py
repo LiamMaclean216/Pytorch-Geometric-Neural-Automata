@@ -55,7 +55,7 @@ class Dataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)    
 
-n = 3
+n = 7
 drop = None#3
 class TranslateDataset(Dataset):
     def __init__(self, diff=1) -> None:
@@ -111,13 +111,13 @@ class MetaDataset():
         # self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3, TimeDataset4]]
         # self.datasets = [dataset() for dataset in [FTDataset2, FTDataset3]]
         self.datasets = [
-            TranslateDataset(1),
-            # TranslateDataset(2),
-            # TranslateDataset(0),
-            # TranslateDataset(2),
-            # TranslateDataset(3),
+            # TranslateDataset(1),
+            TranslateDataset(2),
+            TranslateDataset(0),
+            TranslateDataset(2),
+            TranslateDataset(3),
             TranslateDataset(-1),
-            # TranslateDataset(-2),
+            TranslateDataset(-2),
             ]
         
         
