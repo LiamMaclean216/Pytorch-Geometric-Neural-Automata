@@ -68,7 +68,7 @@ class UpdateRule(torch.nn.Module):
         
         self.layer_norm6 = LayerNorm(hidden_dim)
         
-        self.conv1 = GCNConv(2*self.total_hidden_dim+1, network_width, aggr='max')
+        self.conv1 = GCNConv(self.total_hidden_dim+1, network_width, aggr='max')
         
         # self.linear1 = nn.Linear(network_width*heads, network_width*heads)
         # self.linear2 = nn.Linear(network_width*heads, network_width*heads)
@@ -87,7 +87,13 @@ class UpdateRule(torch.nn.Module):
         self.conv4 = GCNConv(network_width, network_width, aggr='max')
         self.conv5 = GCNConv(network_width, network_width, aggr='max')
         
-        self.forgor = nn.Linear(network_width, 2)
+        # self.forgor = nn.Linear(network_width, 2)
+        self.forgor1 = GCNConv(network_width+1, network_width, aggr='max')
+        self.forgor2 = GCNConv(network_width, hidden_dim+1, aggr='max')
+         
+         
+        self.update1 = GCNConv(network_width+1, network_width, aggr='max')
+        self.update2 = GCNConv(network_width, hidden_dim, aggr='max')
         
         # self.conv_out = GATConv(network_width*heads, hidden_dim, heads = 1, edge_dim = edge_dim)
         self.conv_out = GCNConv(network_width, hidden_dim, aggr='max')
@@ -174,21 +180,19 @@ class UpdateRule(torch.nn.Module):
         network_out = []
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
-            last = idx == 1
+            last = idx == 1#len(data) - 1
             
             # network_in.append(problem_data_x.float().squeeze(0).numpy())
             # network_out.append(problem_data_y.float().squeeze(0).numpy())
             
-            # problem_data_y_ = problem_data_y.float().to(cuda_device).unsqueeze(-1) 
-            # problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)), dim = 2)
+            problem_data_y_ = problem_data_y.float().to(cuda_device).unsqueeze(-1) 
+            problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)), dim = 2)
             
             # if idx != len(data) - 1:
             if not last:
-                # x = self.vectorize_output(x, problem_data_y_)
-                x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                x = self.vectorize_output(x, problem_data_y_)
             else:
-                # x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
-                x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
             
             # problem_data_x = problem_data_x.repeat(n_steps, 1)#.unsqueeze(0).transpose(1,2)
             input_data = problem_data_x.float().unsqueeze(-1).to(cuda_device)
@@ -199,6 +203,10 @@ class UpdateRule(torch.nn.Module):
             
             
             for _ in range(n_steps):
+                if not last:
+                    x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                else:
+                    x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
                 x = self.step(x, edge_attr=edge_attr)
             
             if last:
@@ -238,53 +246,54 @@ class UpdateRule(torch.nn.Module):
         
     
     def step(self, x, edge_attr = None):
-        skip = x[:, :-1]
+        # skip = x[:, :-1]
         
         # print(x.shape)
         
-        x = torch.cat((x, self.initial_state()), dim = -1)
+        forgor = self.forgor1(x, self.edge_index)
+        forgor = self.forgor2(forgor, self.edge_index).sigmoid()
+        x = x * forgor
+        
+        
+        update = self.update1(x, self.edge_index)
+        update = self.update2(update, self.edge_index).sigmoid() 
+        
+        # x = torch.cat((x, self.initial_state()), dim = -1)
         # print(x.shape)
         
-        x = self.conv1(x, self.edge_index)
-        x = self.layer_norm1(x)
-        # x = PairNorm()(x)
-        x = self.relu(x)
         
-        # x = self.linear1(x)
+        updatet = self.conv1(x, self.edge_index)
+        # updatet = self.layer_norm1(updatet)
+        updatet = self.relu(updatet)
+        
+        
+        updatet = self.conv2(updatet, self.edge_index)
+        # updatet = self.layer_norm2(updatet)
+        # updatet = self.relu(updatet)
+        
+        # x = self.conv3(x, self.edge_index)
+        # x = self.layer_norm3(x)
         # x = self.relu(x)
         
-        # x = self.linear2(x)
+        # x = self.conv4(x, self.edge_index)
+        # x = self.layer_norm4(x)
+        # x += skip
+        # skip = x
         # x = self.relu(x)
         
-        x = self.conv2(x, self.edge_index)
-        x = self.layer_norm2(x)
-        
-        x += skip
-        skip = x
-        x = self.relu(x)
-        
-        x = self.conv3(x, self.edge_index)
-        x = self.layer_norm3(x)
-        x = self.relu(x)
-        
-        x = self.conv4(x, self.edge_index)
-        x = self.layer_norm4(x)
-        x += skip
-        skip = x
-        x = self.relu(x)
-        
-        x = self.conv5(x, self.edge_index)
-        x = self.layer_norm5(x)
-        x = self.relu(x)
+        # x = self.conv5(x, self.edge_index)
+        # x = self.layer_norm5(x)
+        # x = self.relu(x)
             
-        x = self.conv_out(x, self.edge_index)
-        x = self.layer_norm6(x)
+        updatet = self.conv_out(updatet, self.edge_index).tanh()
+        # updatet = self.layer_norm6(updatet)
         # x = PairNorm()(x)
         
+        x = x[:, :-1] + updatet * update
         
-        forgor = self.forgor(skip).softmax(dim = -1)
+        # forgor = self.forgor(skip).softmax(dim = -1)
         
-        x = x * forgor[:, 0].unsqueeze(-1) + skip * forgor[:, 1].unsqueeze(-1) 
+        # x = x * forgor[:, 0].unsqueeze(-1) + skip * forgor[:, 1].unsqueeze(-1) 
         
         # x += skip 
         
