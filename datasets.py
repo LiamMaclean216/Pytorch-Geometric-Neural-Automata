@@ -1,7 +1,7 @@
 import torch
 from torch.nn.functional import one_hot
 from torch.utils.data import DataLoader
-
+import random
 
 class SelfOrganizeTest(torch.nn.Module):
     """
@@ -55,17 +55,33 @@ class Dataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)    
 
-n = 7
-drop = None#3
+
 class TranslateDataset(Dataset):
-    def __init__(self, diff=1) -> None:
+    def __init__(self, diff=1, drops = None) -> None:
+        n = 4
+        if drops is None:
+            drops = [random.randint(1, n-1)]
+        # drops = [3]
         
         arr = torch.arange(n)
+        
 
-        if drop:
+        for drop in drops:
             arr = torch.cat([arr[:drop-1], arr[drop:]])
-    
-        super().__init__(one_hot(arr, n), one_hot((arr+diff)%n, n))
+
+        test = random.randint(1, n-1)
+        # arr = torch.tensor([test, test])
+        
+        data = one_hot(arr, n)
+        targets = one_hot((arr+diff)%n, n)
+        
+        
+        # data =  torch.concat((data, data), 0)
+        # targets =  torch.concat((targets, targets), 0)
+        
+        
+        
+        super().__init__(data, targets)
 
 
 # class TranslateDataset2(Dataset):
@@ -110,23 +126,34 @@ class MetaDataset():
         # self.datasets = [dataset() for dataset in [TranslateDataset]]
         # self.datasets = [dataset() for dataset in [TimeDataset1, TimeDataset2, TimeDataset3, TimeDataset4]]
         # self.datasets = [dataset() for dataset in [FTDataset2, FTDataset3]]
+        self.init()
+        
+        
+    def init(self):
         self.datasets = [
             # TranslateDataset(1),
-            TranslateDataset(2),
             TranslateDataset(0),
-            TranslateDataset(2),
-            TranslateDataset(3),
-            TranslateDataset(-1),
-            TranslateDataset(-2),
+            # TranslateDataset(2),
+            # TranslateDataset(3),
+            # TranslateDataset(-1),
+            # TranslateDataset(-2),
             ]
-        
         
     def iterate(self):
         """
         returns a generator that gives an shuffled index
         """
+        self.init()
         return iter(torch.randperm(len(self.datasets)))
 
+    @property
+    def n_inputs(self):
+        return self.datasets[0].data.shape[1]
+
+    @property
+    def n_outputs(self):
+        return self.datasets[0].target.shape[1]
+    
     def get_set(self, n):
         return DataLoader(self.datasets[n] , batch_size=1, shuffle=True)
     

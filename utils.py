@@ -36,6 +36,23 @@ def get_type(x, hidden_dim: int = 1):
     return x[:,hidden_dim:]#.unsqueeze(-1)
 
     
+    
+def add_reverse_edges(edges):
+    """
+    [
+        [0]
+        [1]
+    ]
+    becomes
+    [
+        [0,1]
+        [1,0]
+    ]
+    """
+    edges = edges.transpose(0,1)
+    return torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0).transpose(0,1)
+
+
 def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="dense"):
     """
     Builds edges like 2d_grid_graph
@@ -52,6 +69,8 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
         edges = torch.tensor(edge_list)
     elif mode == "dense":
         edges = grid(height, width)[0].transpose(0,1)
+    else:
+        raise ValueError("mode must be either 'grid' or 'dense'")
     
     
     #input neurons
@@ -60,7 +79,7 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
             [x, (height*width) + y] for x in range(width)
         ] for y in range(n_inputs)
     ]).view(-1, 2)
-
+    
     #output neurons
     output_edges = torch.tensor([
         [
@@ -68,13 +87,13 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
         ] for y in range(n_outputs)
     ]).view(-1, 2)
 
-    #merge edges and input_edges
+
+    input_edges = add_reverse_edges(input_edges)
+    output_edges = add_reverse_edges(output_edges)
+    
     edges = torch.cat((edges, input_edges, output_edges), dim=0).transpose(0,1)
     
-    edges =  torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0) #?
     edges = remove_self_loops(edges)[0]
-    
-    
     
     return edges
 
