@@ -1,6 +1,6 @@
 import torch
 import networkx as nx
-from torch_geometric.utils import grid, remove_self_loops
+from torch_geometric.utils import grid, remove_self_loops, add_self_loops
 
 # type_dict = {"hidden": 0, "input": 1, "output": 2}
 type_dict = {"hidden": [1, 0, 0], "input": [0, 1, 0], "output": [0, 0, 1]}
@@ -74,18 +74,20 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     
     
     #input neurons
-    input_edges = torch.tensor([
-        [
-            [x, (height*width) + y] for x in range(width)
-        ] for y in range(n_inputs)
-    ]).view(-1, 2)
+    # input_edges = torch.tensor([
+    #     [
+    #         [x, (height*width) + y] for x in range(width)
+    #     ] for y in range(n_inputs)
+    # ]).view(-1, 2)
+    input_edges = torch.tensor([[[x, (height*width) + x] for x in range(width)]]).view(-1, 2)
     
     #output neurons
-    output_edges = torch.tensor([
-        [
-            [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
-        ] for y in range(n_outputs)
-    ]).view(-1, 2)
+    # output_edges = torch.tensor([
+    #     [
+    #         [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
+    #     ] for y in range(n_outputs)
+    # ]).view(-1, 2)
+    output_edges = torch.tensor([[[(height*width)-(x+1), (height*width) + x+n_inputs] for x in range(width)]]).view(-1, 2)
 
 
     input_edges = add_reverse_edges(input_edges)
@@ -94,7 +96,7 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     edges = torch.cat((edges, input_edges, output_edges), dim=0).transpose(0,1)
     
     edges = remove_self_loops(edges)[0]
-    
+    edges = add_self_loops(edges)[0]
     return edges
 
 

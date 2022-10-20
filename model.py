@@ -39,6 +39,11 @@ class UpdateRule(torch.nn.Module):
         skip_size = hidden_dim
         self.total_hidden_dim = hidden_dim# + skip_size
         
+        fill_value = 'mean'
+        if edge_dim is not None:
+            fill_value = nn.Parameter(torch.zeros([edge_dim])).to(cuda_device)
+        # fill_value[0] = 1
+        # fill_value = None
         # self.initial = nn.parameter.Parameter(
         #     torch.zeros([n_outputs + n_inputs, self.total_hidden_dim]), requires_grad=True
         # ).to(cuda_device)
@@ -49,7 +54,7 @@ class UpdateRule(torch.nn.Module):
         self.relu = nn.ReLU()
         
         # self.input_vectorizer = nn.Linear(n_inputs, self.total_hidden_dim, bias=True)
-        self.input_vector_size = 8
+        self.input_vector_size = 2
         self.input_vectorizer = nn.Linear(1, self.input_vector_size)
         
         # Vectorizes training targets
@@ -63,40 +68,39 @@ class UpdateRule(torch.nn.Module):
         self.layer_norm2 = LayerNorm(network_width*heads)
         self.layer_norm3 = LayerNorm(network_width*heads)
         self.layer_norm4 = LayerNorm(network_width*heads)
-        self.layer_norm5 = LayerNorm(network_width*heads)
+        self.layer_norm5 = LayerNorm(hidden_dim)
+        self.layer_norm6 = LayerNorm(network_width*heads)
+        self.layer_norm7 = LayerNorm(network_width*heads)
         
         
-        self.layer_norm6 = LayerNorm(hidden_dim)
+        self.conv1 = GATConv(self.total_hidden_dim+2, network_width, heads = heads, edge_dim = edge_dim, fill_value=fill_value, add_self_loops=False)
+        # self.conv1 = GCNConv(self.total_hidden_dim+1, network_width, aggr='max')
+        self.conv2 = GATConv(network_width*heads, network_width, heads = heads, edge_dim = edge_dim, fill_value=fill_value, add_self_loops=False)
+        # self.conv2 = GCNConv(network_width, network_width, aggr='max')
         
-        self.conv1 = GCNConv(self.total_hidden_dim+1, network_width, aggr='max')
-        
-        # self.linear1 = nn.Linear(network_width*heads, network_width*heads)
-        # self.linear2 = nn.Linear(network_width*heads, network_width*heads)
+        self.conv3 = GATConv(network_width*heads, network_width, heads = heads, edge_dim = edge_dim, fill_value=fill_value, add_self_loops=False)
+        self.conv4 = GATConv(network_width*heads, network_width, heads = heads, edge_dim = edge_dim, fill_value=fill_value, add_self_loops=False)
         
         
-        # self.conv1 = A3TGCN(self.total_hidden_dim, hidden_dim, 5)
+        self.conv_out = GATConv(network_width*heads, hidden_dim, heads = 1, edge_dim = edge_dim, fill_value=fill_value, add_self_loops=False)
         
-        self.n_hidden_rule_layers = 1
-        # self.conv2 = Sequential('x, edge_index', 
-        #                                      [x for i in range(n_hidden_rule_layers) for x in 
-        #                                       [(GCNConv(width, width), 'x, edge_index -> x'), LeakyReLU(0.1, True)]])
-        # self.conv2 = GATConv(network_width*heads, network_width, heads = heads, edge_dim = edge_dim)
-        # self.conv2 = A3TGCN(network_width, network_width, 5)
-        self.conv2 = GCNConv(network_width, network_width, aggr='max')
-        self.conv3 = GCNConv(network_width, network_width, aggr='max')
-        self.conv4 = GCNConv(network_width, network_width, aggr='max')
-        self.conv5 = GCNConv(network_width, network_width, aggr='max')
-        
-        # self.forgor = nn.Linear(network_width, 2)
-        self.forgor1 = GCNConv(network_width+1, network_width, aggr='max')
-        self.forgor2 = GCNConv(network_width, hidden_dim+1, aggr='max')
+        # self.forgor1 = GCNConv(network_width+1, network_width, aggr='max')
+        # self.forgor1 = GATConv(network_width+1, network_width, heads = heads, edge_dim = edge_dim)
+        # self.forgor2 = GCNConv(network_width, hidden_dim+1, aggr='max')
+        # self.forgor2 = GATConv(network_width*heads, hidden_dim+1, heads = 1, edge_dim = edge_dim)
+        self.forgor1 = nn.Linear(network_width+2, network_width)
+        self.forgor2 = nn.Linear(network_width, hidden_dim+2)
          
          
-        self.update1 = GCNConv(network_width+1, network_width, aggr='max')
-        self.update2 = GCNConv(network_width, hidden_dim, aggr='max')
+        # self.update1 = GCNConv(network_width+1, network_width, aggr='max')
+        # self.update1 = GATConv(network_width+1, network_width, heads = heads, edge_dim = edge_dim)
+        # self.update2 = GCNConv(network_width, hidden_dim, aggr='max')
+        # self.update2 = GATConv(network_width*heads, hidden_dim, heads = 1, edge_dim = edge_dim)
         
-        # self.conv_out = GATConv(network_width*heads, hidden_dim, heads = 1, edge_dim = edge_dim)
-        self.conv_out = GCNConv(network_width, hidden_dim, aggr='max')
+        self.update1 = nn.Linear(network_width+2, network_width)
+        self.update2 = nn.Linear(network_width, hidden_dim)
+        
+        # self.conv_out = GCNConv(network_width, hidden_dim, aggr='max')
         
         self.reset()
 
@@ -129,7 +133,7 @@ class UpdateRule(torch.nn.Module):
         return self.initial
         
     
-    def build_graph(self, height, width):
+    def build_graph(self, height, width, mode="dense"):
         self.initial_state(height, width, build=True)
         self.width = width
         self.height = height
@@ -139,14 +143,16 @@ class UpdateRule(torch.nn.Module):
         # self.initial = nn.parameter.Parameter(torch.zeros([n_nodes, self.total_hidden_dim]), requires_grad=True)
         
         # Build graph
-        edges = build_edges(self.n_inputs, self.n_outputs, height, width)
+        edges = build_edges(self.n_inputs, self.n_outputs, height, width, mode=mode)
         
         self.graph = Data(edge_index=edges, x=torch.zeros(n_nodes, self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone()
         
-        self.edge_attr = nn.parameter.Parameter(
-            torch.zeros([self.graph.edge_index[0].shape[0], self.edge_dim])
-        ).to(cuda_device)
+        self.edge_attr = None
+        if self.edge_dim is not None:
+            self.edge_attr = nn.parameter.Parameter(
+                torch.zeros([self.graph.edge_index[0].shape[0], self.edge_dim])
+            ).to(cuda_device)
         
     
     def draw(self):
@@ -181,32 +187,35 @@ class UpdateRule(torch.nn.Module):
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
             last = idx == 1#len(data) - 1
-            
             # network_in.append(problem_data_x.float().squeeze(0).numpy())
             # network_out.append(problem_data_y.float().squeeze(0).numpy())
-            
             problem_data_y_ = problem_data_y.float().to(cuda_device).unsqueeze(-1) 
             problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)), dim = 2)
             
-            # if idx != len(data) - 1:
-            if not last:
-                x = self.vectorize_output(x, problem_data_y_)
-            else:
-                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
+            
             
             # problem_data_x = problem_data_x.repeat(n_steps, 1)#.unsqueeze(0).transpose(1,2)
             input_data = problem_data_x.float().unsqueeze(-1).to(cuda_device)
             
             # if last:
-            x = self.vectorise_input(x, input_data)
             
             
             
             for _ in range(n_steps):
                 if not last:
+                    x = self.vectorize_output(x, problem_data_y_)
+                else:
+                    x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
+                    
+                x = self.vectorise_input(x, input_data)
+                
+                if not last:
                     x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                    x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                    
                 else:
                     x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                    x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
                 x = self.step(x, edge_attr=edge_attr)
             
             if last:
@@ -215,10 +224,10 @@ class UpdateRule(torch.nn.Module):
                 
         # print("#################")    
         network_output = self.get_output(x)
-        # loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float().squeeze(0))
+        loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float().squeeze(0))
         
         #l2 loss
-        loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
+        # loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
         
         loss /= len(data)
         
@@ -250,24 +259,41 @@ class UpdateRule(torch.nn.Module):
         
         # print(x.shape)
         
-        forgor = self.forgor1(x, self.edge_index)
-        forgor = self.forgor2(forgor, self.edge_index).sigmoid()
-        x = x * forgor
+        # forgor = self.forgor1(x, self.edge_index)
+        forgor = self.forgor1(x).sigmoid()
+        # forgor = self.layer_norm1(forgor)
+        # forgor = self.forgor2(forgor, self.edge_index).sigmoid()
+        forgor = self.forgor2(forgor).sigmoid()
+        x = (x * forgor) + (
+            (1 - forgor) * torch.cat(
+                (self.initial_state(), torch.zeros([self.initial_state().shape[0], 2]).to(cuda_device))
+                , dim = -1))
         
         
-        update = self.update1(x, self.edge_index)
-        update = self.update2(update, self.edge_index).sigmoid() 
+        # update = self.update1(x#, self.edge_index)
+        update = self.update1(x).sigmoid()
+        # update = self.layer_norm2(update)
+        # update = self.update2(update, self.edge_index).sigmoid() 
+        update = self.update2(update).sigmoid() 
         
         # x = torch.cat((x, self.initial_state()), dim = -1)
         # print(x.shape)
         
         
-        updatet = self.conv1(x, self.edge_index)
-        # updatet = self.layer_norm1(updatet)
+        updatet = self.conv1(x, self.edge_index, edge_attr=edge_attr)
+        updatet = self.layer_norm3(updatet)
         updatet = self.relu(updatet)
         
         
-        updatet = self.conv2(updatet, self.edge_index)
+        updatet = self.conv2(updatet, self.edge_index, edge_attr=edge_attr)
+        updatet = self.layer_norm3(updatet)
+        
+        updatet = self.conv3(updatet, self.edge_index, edge_attr=edge_attr)
+        updatet = self.layer_norm6(updatet)
+        
+        updatet = self.conv4(updatet, self.edge_index, edge_attr=edge_attr)
+        updatet = self.layer_norm7(updatet)
+        
         # updatet = self.layer_norm2(updatet)
         # updatet = self.relu(updatet)
         
@@ -285,11 +311,13 @@ class UpdateRule(torch.nn.Module):
         # x = self.layer_norm5(x)
         # x = self.relu(x)
             
-        updatet = self.conv_out(updatet, self.edge_index).tanh()
+        updatet = self.conv_out(updatet, self.edge_index, edge_attr=edge_attr).tanh()
         # updatet = self.layer_norm6(updatet)
         # x = PairNorm()(x)
         
-        x = x[:, :-1] + updatet * update
+        
+        x = x[:, :-2] + updatet * update
+        # x = self.layer_norm5(x)
         
         # forgor = self.forgor(skip).softmax(dim = -1)
         
