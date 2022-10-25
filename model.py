@@ -3,8 +3,8 @@ from turtle import forward
 from torch_geometric.nn import GCNConv, Sequential, GATConv, GATv2Conv
 from torch_geometric.nn.norm import LayerNorm, PairNorm
  
-from torch_geometric_temporal.nn.attention import STConv
-from torch_geometric_temporal.nn.recurrent import GConvGRU, A3TGCN
+# from torch_geometric_temporal.nn.attention import STConv
+# from torch_geometric_temporal.nn.recurrent import GConvGRU, A3TGCN
 
 
 from torch.nn import ReLU, LeakyReLU
@@ -114,21 +114,21 @@ class UpdateRule(torch.nn.Module):
         
         
         #trained initial on only input and output nodes
-        # if height is not None and width is not None:
-        #     self.initial = nn.parameter.Parameter(
-        #         torch.zeros([self.n_outputs + self.n_inputs, self.total_hidden_dim]), requires_grad=True
-        #     ).to(cuda_device)
-        
-        # return torch.concat(
-        #     (torch.zeros([height*width, self.total_hidden_dim]).to(cuda_device),
-        #     self.initial)
-        # )
-        
-        # Trained initial on all nodes including hidden
         if build:
             self.initial = nn.parameter.Parameter(
-                torch.zeros([height*width + self.n_outputs + self.n_inputs, self.total_hidden_dim])#, requires_grad=True
+                torch.zeros([self.n_outputs + self.n_inputs, self.total_hidden_dim]), requires_grad=True
             ).to(cuda_device)
+        
+        return torch.concat(
+            (torch.zeros([height*width, self.total_hidden_dim]).to(cuda_device),
+            self.initial)
+        )
+        
+        # Trained initial on all nodes including hidden
+        # if build:
+        #     self.initial = nn.parameter.Parameter(
+        #         torch.zeros([height*width + self.n_outputs + self.n_inputs, self.total_hidden_dim])#, requires_grad=True
+        #     ).to(cuda_device)
         
         return self.initial
         
@@ -181,7 +181,8 @@ class UpdateRule(torch.nn.Module):
         x = x + mask
         return x
     
-    def forward(self, x, n_steps, data, plug_output_data = False, return_all = True, edge_attr = None):
+    def forward(self, x, n_steps, data, plug_output_data = False, return_all = True, edge_index=None, edge_attr = None):
+
         network_in = []
         network_out = []
         
@@ -216,7 +217,7 @@ class UpdateRule(torch.nn.Module):
                 else:
                     x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
                     x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                x = self.step(x, edge_attr=edge_attr)
+                x = self.step(x, edge_attr=edge_attr, edge_index=edge_index)
             
             if last:
                 break
@@ -254,8 +255,9 @@ class UpdateRule(torch.nn.Module):
         return x
         
     
-    def step(self, x, edge_attr = None):
-        # skip = x[:, :-1]
+    def step(self, x, edge_attr = None, edge_index = None):
+        if edge_index is None:
+            edge_index = self.edge_index
         
         # print(x.shape)
         
@@ -280,18 +282,18 @@ class UpdateRule(torch.nn.Module):
         # print(x.shape)
         
         
-        updatet = self.conv1(x, self.edge_index, edge_attr=edge_attr)
+        updatet = self.conv1(x, edge_index, edge_attr=edge_attr)
         updatet = self.layer_norm3(updatet)
         updatet = self.relu(updatet)
         
         
-        updatet = self.conv2(updatet, self.edge_index, edge_attr=edge_attr)
+        updatet = self.conv2(updatet, edge_index, edge_attr=edge_attr)
         updatet = self.layer_norm3(updatet)
         
-        updatet = self.conv3(updatet, self.edge_index, edge_attr=edge_attr)
+        updatet = self.conv3(updatet, edge_index, edge_attr=edge_attr)
         updatet = self.layer_norm6(updatet)
         
-        updatet = self.conv4(updatet, self.edge_index, edge_attr=edge_attr)
+        updatet = self.conv4(updatet, edge_index, edge_attr=edge_attr)
         updatet = self.layer_norm7(updatet)
         
         # updatet = self.layer_norm2(updatet)
@@ -311,7 +313,7 @@ class UpdateRule(torch.nn.Module):
         # x = self.layer_norm5(x)
         # x = self.relu(x)
             
-        updatet = self.conv_out(updatet, self.edge_index, edge_attr=edge_attr).tanh()
+        updatet = self.conv_out(updatet, edge_index, edge_attr=edge_attr).tanh()
         # updatet = self.layer_norm6(updatet)
         # x = PairNorm()(x)
         

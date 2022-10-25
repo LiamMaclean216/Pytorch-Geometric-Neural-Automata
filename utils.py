@@ -72,6 +72,8 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     else:
         raise ValueError("mode must be either 'grid' or 'dense'")
     
+    # edges = torch.concat((torch.tensor([[0,3], [3,0], [4,7], [7,4]]), edges))
+
     
     #input neurons
     # input_edges = torch.tensor([
