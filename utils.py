@@ -67,6 +67,7 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
             edge_list[i] = (node_list.index(edge_list[i][0]), node_list.index(edge_list[i][1]))
             
         edges = torch.tensor(edge_list)
+        edges = add_reverse_edges(edges)
     elif mode == "dense":
         edges = grid(height, width)[0].transpose(0,1)
     else:
@@ -76,20 +77,20 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
 
     
     #input neurons
-    # input_edges = torch.tensor([
-    #     [
-    #         [x, (height*width) + y] for x in range(width)
-    #     ] for y in range(n_inputs)
-    # ]).view(-1, 2)
-    input_edges = torch.tensor([[[x, (height*width) + x] for x in range(width)]]).view(-1, 2)
+    input_edges = torch.tensor([
+        [
+            [x, (height*width) + y] for x in range(width)
+        ] for y in range(n_inputs)
+    ]).view(-1, 2)
+    # input_edges = torch.tensor([[[x, (height*width) + x] for x in range(width)]]).view(-1, 2)
     
     #output neurons
-    # output_edges = torch.tensor([
-    #     [
-    #         [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
-    #     ] for y in range(n_outputs)
-    # ]).view(-1, 2)
-    output_edges = torch.tensor([[[(height*width)-(x+1), (height*width) + x+n_inputs] for x in range(width)]]).view(-1, 2)
+    output_edges = torch.tensor([
+        [
+            [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
+        ] for y in range(n_outputs)
+    ]).view(-1, 2)
+    # output_edges = torch.tensor([[[(height*width)-(x+1), (height*width) + x+n_inputs] for x in range(width)]]).view(-1, 2)
 
 
     input_edges = add_reverse_edges(input_edges)

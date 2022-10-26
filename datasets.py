@@ -58,7 +58,7 @@ class Dataset(torch.utils.data.Dataset):
 
 class TranslateDataset(Dataset):
     def __init__(self, diff=1, drops = None) -> None:
-        n = 3
+        n = 5
         if drops is None:
             drops = [random.randint(1, n-1)]
         # drops = [3]

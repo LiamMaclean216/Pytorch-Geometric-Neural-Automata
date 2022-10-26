@@ -156,7 +156,7 @@ class UpdateRule(torch.nn.Module):
         
     
     def draw(self):
-        graph = utils.to_networkx(self.graph, to_undirected=True, remove_self_loops = True)
+        graph = utils.to_networkx(self.graph, to_undirected=False, remove_self_loops = True)
         nx.draw(graph)
     
     
@@ -187,7 +187,7 @@ class UpdateRule(torch.nn.Module):
         network_out = []
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
-            last = idx == 1#len(data) - 1
+            last = idx == 2#len(data) - 1
             # network_in.append(problem_data_x.float().squeeze(0).numpy())
             # network_out.append(problem_data_y.float().squeeze(0).numpy())
             problem_data_y_ = problem_data_y.float().to(cuda_device).unsqueeze(-1) 
