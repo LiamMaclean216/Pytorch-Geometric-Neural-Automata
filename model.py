@@ -30,7 +30,7 @@ class UpdateRule(torch.nn.Module):
                 heads = 4):
         
         super(UpdateRule, self).__init__()
-        # torch.manual_seed(12312345)
+        torch.manual_seed(12345)
         
         self.edge_dim = edge_dim
         self.n_inputs = n_inputs

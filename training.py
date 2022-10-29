@@ -1,13 +1,24 @@
 from turtle import update
 import numpy as np
 import torch.nn as nn
+import wandb
 
-#numpy only displays 3 decimal places
+# numpy only displays 3 decimal places
 np.set_printoptions(precision=3)
 
 
-
-def train_on_meta_set(update_rule, optimizer, meta_set, training_params: dict, edge_attr=None, verbose=True, edge_index=None):
+def train_on_meta_set(
+    update_rule, 
+    optimizer, 
+    meta_set, 
+    training_params: dict, 
+    edge_attr=None, 
+    verbose=True, 
+    edge_index=None, 
+    wandb_log=True,
+    wandb_loss='loss',
+    wandb_acc='acc',
+    ):
     """
     Train on meta dataset
     Args:
@@ -27,27 +38,27 @@ def train_on_meta_set(update_rule, optimizer, meta_set, training_params: dict, e
         accuracy = 0
         for _ in range(training_params["batch_size"]):
             for set_idx in meta_set.iterate():
-                
-                update_rule.reset() 
+
+                update_rule.reset()
                 x = update_rule.initial_state()
 
                 x, batch_loss, network_output, correct, network_in = update_rule(
                     x, training_params["n_steps"], meta_set.get_set(set_idx), edge_attr=edge_attr, edge_index=edge_index
                 )
                 loss += batch_loss
-        
+
             accuracy += (np.round(network_output) == correct).all()
-        
+
         loss /= training_params["batch_size"]
         accuracy /= training_params["batch_size"]
-        
+        if wandb_log:
+            wandb.log({wandb_loss: loss, wandb_acc: accuracy})
         loss_integral += loss
         loss.backward()
-            
-            
+
         nn.utils.clip_grad_norm_(update_rule.parameters(), 1)
-        optimizer.step()  
-        optimizer.zero_grad()  
+        optimizer.step()
+        optimizer.zero_grad()
         if verbose:
             print(f"""\r 
                 Epoch {epoch * training_params["batch_size"]} |
@@ -59,7 +70,5 @@ def train_on_meta_set(update_rule, optimizer, meta_set, training_params: dict, e
                 """.replace("\n", " ").replace("            ", ""), end="")
             if epoch % (100 // training_params["batch_size"]) == 0:
                 print()
-            
+
     return loss_integral
-        
-    
