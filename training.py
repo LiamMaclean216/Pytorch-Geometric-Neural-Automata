@@ -1,6 +1,7 @@
 from turtle import update
 import numpy as np
 import torch.nn as nn
+import torch
 import wandb
 
 # numpy only displays 3 decimal places
@@ -18,6 +19,7 @@ def train_on_meta_set(
     wandb_log=True,
     wandb_loss='loss',
     wandb_acc='acc',
+    save_dir=None,
     ):
     """
     Train on meta dataset
@@ -51,8 +53,13 @@ def train_on_meta_set(
 
         loss /= training_params["batch_size"]
         accuracy /= training_params["batch_size"]
+
         if wandb_log:
-            wandb.log({wandb_loss: loss, wandb_acc: accuracy})
+            wandb.log(
+                {wandb_loss: loss, wandb_acc: accuracy}, 
+                step=epoch, 
+                commit = (epoch % 25 == 0 or epoch == training_params["n_epochs"] - 1)
+            )
         loss_integral += loss
         loss.backward()
 
@@ -70,5 +77,9 @@ def train_on_meta_set(
                 """.replace("\n", " ").replace("            ", ""), end="")
             if epoch % (100 // training_params["batch_size"]) == 0:
                 print()
+        
+        if save_dir is not None and epoch % (100 // training_params["batch_size"]) == 0:
+            torch.save(update_rule.state_dict(), f"{save_dir}.pt")
+
 
     return loss_integral
