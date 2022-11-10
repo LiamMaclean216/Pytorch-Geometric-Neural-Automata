@@ -58,7 +58,7 @@ class Dataset(torch.utils.data.Dataset):
 
 class TranslateDataset(Dataset):
     def __init__(self, diff=1, drops = None) -> None:
-        n = 5
+        n = 3
         if drops is None:
             drops = [random.randint(1, n-1)]
         # drops = [3]
@@ -131,11 +131,11 @@ class MetaDataset():
         
     def init(self):
         self.datasets = [
-            TranslateDataset(1),
+            # TranslateDataset(1),
             TranslateDataset(0),
             # TranslateDataset(2),
             # TranslateDataset(3),
-            TranslateDataset(-1),
+            # TranslateDataset(-1),
             # TranslateDataset(-2),
             ]
         

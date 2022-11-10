@@ -8,9 +8,30 @@ from torch import Tensor
 import torch
 
 class LiamLayer(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, aggr='add'):
+        super(LiamLayer, self).__init__()
+        self.conv = GCNConv(in_channels, out_channels, aggr=aggr)
+        self.forgor = nn.Linear(in_channels, in_channels)
+        self.update = nn.Linear(in_channels, out_channels)
+        self.layerNorm = LayerNorm(out_channels)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
 
-        pass
+    def forward(self, x, edge_index, initial = None, edge_attr=None):
+        if initial is None:
+            initial = torch.zeros_like(x)
+        forgor = torch.sigmoid(self.forgor(x))
+        # x = (x * forgor) + (
+        #     (1 - forgor) * torch.cat(
+        #         (initial, torch.zeros([initial.shape[0], 2]).to(cuda_device))
+        #         , dim = -1))[:,:self.in_channels]
+        # x = (x * forgor) + ((1-forgor) * initial)
+        # x = (x * forgor)
+        update = torch.sigmoid(self.update(x))
+        x =(self.conv(x, edge_index) * update)
+        # x = x + self.conv(x, edge_index).relu()
+        # x = self.layerNorm(x).relu()
+        return x
 
 from torch.nn import ReLU, LeakyReLU
 import torch
@@ -102,6 +123,13 @@ class UpdateRule(torch.nn.Module):
         
         # self.conv_out = GCNConv(network_width, hidden_dim, aggr='max')
         
+        self.layer1 = LiamLayer(self.total_hidden_dim, network_width)
+        self.layer2 = LiamLayer(network_width, network_width)
+        self.layer3 = LiamLayer(network_width, network_width)
+        self.layer4 = LiamLayer(network_width, network_width)
+        self.layer_out = LiamLayer(network_width, hidden_dim)
+
+
         self.reset()
 
 
@@ -196,7 +224,7 @@ class UpdateRule(torch.nn.Module):
         network_out = []
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
-            last = idx == 2#len(data) - 1
+            last = idx == 0#len(data) - 1
             # network_in.append(problem_data_x.float().squeeze(0).numpy())
             # network_out.append(problem_data_y.float().squeeze(0).numpy())
             problem_data_y_ = problem_data_y.float().to(cuda_device).unsqueeze(-1) 
@@ -212,20 +240,19 @@ class UpdateRule(torch.nn.Module):
             
             
             for _ in range(n_steps):
-                if not last:
-                    x = self.vectorize_output(x, problem_data_y_)
-                else:
-                    x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
+                # if not last:
+                #     x = self.vectorize_output(x, problem_data_y_)
+                # else:
+                #     x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
                     
                 x = self.vectorise_input(x, input_data)
                 
-                if not last:
-                    x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                    x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                    
-                else:
-                    x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                    x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                # if not last:
+                #     x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                #     x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                # else:
+                #     x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                #     x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
                 x = self.step(x, edge_attr=edge_attr, edge_index=edge_index)
             
             if last:
@@ -268,75 +295,37 @@ class UpdateRule(torch.nn.Module):
         if edge_index is None:
             edge_index = self.edge_index
         
-        # print(x.shape)
         
-        # forgor = self.forgor1(x, self.edge_index)
-        forgor = self.forgor1(x).sigmoid()
-        # forgor = self.layer_norm1(forgor)
-        # forgor = self.forgor2(forgor, self.edge_index).sigmoid()
-        forgor = self.forgor2(forgor).sigmoid()
-        x = (x * forgor) + (
-            (1 - forgor) * torch.cat(
-                (self.initial_state(), torch.zeros([self.initial_state().shape[0], 2]).to(cuda_device))
-                , dim = -1))
+        # forgor = self.forgor1(x).sigmoid()
+        # forgor = self.forgor2(forgor).sigmoid()
+        # x = (x * forgor) + (
+        #     (1 - forgor) * torch.cat(
+        #         (self.initial_state(), torch.zeros([self.initial_state().shape[0], 2]).to(cuda_device))
+        #         , dim = -1))
+                
+        # update = self.update1(x).sigmoid()
+        # update = self.update2(update).sigmoid() 
         
-        
-        # update = self.update1(x#, self.edge_index)
-        update = self.update1(x).sigmoid()
-        # update = self.layer_norm2(update)
-        # update = self.update2(update, self.edge_index).sigmoid() 
-        update = self.update2(update).sigmoid() 
-        
-        # x = torch.cat((x, self.initial_state()), dim = -1)
-        # print(x.shape)
-        
-        
-        updatet = self.conv1(x, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
-        updatet = self.layer_norm3(updatet)
-        updatet = self.relu(updatet)
-        
-        
-        updatet = self.conv2(updatet, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
-        updatet = self.layer_norm3(updatet)
-        
-        updatet = self.conv3(updatet, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
-        updatet = self.layer_norm6(updatet)
-        
-        updatet = self.conv4(updatet, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
-        updatet = self.layer_norm7(updatet)
-        
-        # updatet = self.layer_norm2(updatet)
+        # updatet = self.conv1(x, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
+        # updatet = self.layer_norm3(updatet)
         # updatet = self.relu(updatet)
-        
-        # x = self.conv3(x, self.edge_index)
-        # x = self.layer_norm3(x)
-        # x = self.relu(x)
-        
-        # x = self.conv4(x, self.edge_index)
-        # x = self.layer_norm4(x)
-        # x += skip
-        # skip = x
-        # x = self.relu(x)
-        
-        # x = self.conv5(x, self.edge_index)
-        # x = self.layer_norm5(x)
-        # x = self.relu(x)
-            
-        updatet = self.conv_out(updatet, edge_index)#, edge_weight=self.get_edge_weight()).tanh()#, edge_attr=edge_attr).tanh()
+        # updatet = self.conv2(updatet, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
+        # updatet = self.layer_norm3(updatet)
+        # updatet = self.conv3(updatet, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
         # updatet = self.layer_norm6(updatet)
-        # x = PairNorm()(x)
+        # updatet = self.conv4(updatet, edge_index)#, edge_weight=self.get_edge_weight())#, edge_attr=edge_attr)
+        # updatet = self.layer_norm7(updatet)
+            
+        # updatet = self.conv_out(updatet, edge_index)#, edge_weight=self.get_edge_weight()).tanh()#, edge_attr=edge_attr).tanh()
         
-        
-        x = x[:, :-2] + updatet * update
-        # x = self.layer_norm5(x)
-        
-        # forgor = self.forgor(skip).softmax(dim = -1)
-        
-        # x = x * forgor[:, 0].unsqueeze(-1) + skip * forgor[:, 1].unsqueeze(-1) 
-        
-        # x += skip 
-        
-        
+        skip  = self.layer1(x, edge_index, edge_attr=edge_attr, initial=self.initial_state())
+        skip  = self.layer2(skip, edge_index, edge_attr=edge_attr, initial=self.initial_state())
+        x = x + skip
+        skip  = self.layer3(x, edge_index, edge_attr=edge_attr, initial=self.initial_state())
+        skip  = self.layer4(skip, edge_index, edge_attr=edge_attr, initial=self.initial_state())
+        x = x + skip
+        skip  = self.layer_out(x, edge_index, edge_attr=edge_attr, initial=self.initial_state())
+
         return x
     
     

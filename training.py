@@ -65,7 +65,7 @@ def train_on_meta_set(
 
         nn.utils.clip_grad_norm_(update_rule.parameters(), 1)
         optimizer.step()
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         if verbose:
             print(f"""\r 
                 Epoch {epoch * training_params["batch_size"]} |
