@@ -57,8 +57,7 @@ class Dataset(torch.utils.data.Dataset):
 
 
 class TranslateDataset(Dataset):
-    def __init__(self, diff=1, drops = None) -> None:
-        n = 5
+    def __init__(self, diff=1, drops = None, n=3) -> None:
         if drops is None:
             drops = [random.randint(1, n-1)]
         # drops = [3]
@@ -114,8 +113,17 @@ class TimeDataset4(Dataset):
         self.data = torch.tensor([[1,1], [0,1], [0,0]])
         self.target = torch.tensor([[0,0,0,0], [0,0,0,0],[0,0,0,1]])
         
-     
+
                             
+class TDataset1(Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[0,1,0,1], [1,0,1,0]])
+        self.target = torch.tensor([[0,1], [1,0]])
+class TDataset2(Dataset):
+    def __init__(self):
+        self.data = torch.tensor([[0,1,1,0], [1,0,0,1]])
+        self.target = torch.tensor([[1,0], [0,1]])
+
      
 class MetaDataset():
     """
@@ -131,12 +139,14 @@ class MetaDataset():
         
     def init(self):
         self.datasets = [
-            TranslateDataset(1),
-            TranslateDataset(0),
+            # TranslateDataset(1),
+            # TranslateDataset(0),
             # TranslateDataset(2),
             # TranslateDataset(3),
-            TranslateDataset(-1),
+            # TranslateDataset(-1),
             # TranslateDataset(-2),
+            TDataset1(),
+            TDataset2(),
             ]
         
     def iterate(self):

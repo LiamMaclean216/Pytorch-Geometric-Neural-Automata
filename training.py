@@ -20,6 +20,7 @@ def train_on_meta_set(
     wandb_loss='loss',
     wandb_acc='acc',
     save_dir=None,
+    **forward_kwargs,
     ):
     """
     Train on meta dataset
@@ -45,11 +46,11 @@ def train_on_meta_set(
                 x = update_rule.initial_state()
 
                 x, batch_loss, network_output, correct, network_in = update_rule(
-                    x, training_params["n_steps"], meta_set.get_set(set_idx), edge_attr=edge_attr, edge_index=edge_index
+                    x, training_params["n_steps"], meta_set.get_set(set_idx), edge_attr=edge_attr, edge_index=edge_index, **forward_kwargs
                 )
                 loss += batch_loss
 
-            accuracy += (np.round(network_output) == correct).all()
+            accuracy += ((network_output.round()) == correct).all()
 
         loss /= training_params["batch_size"]
         accuracy /= training_params["batch_size"]
@@ -65,7 +66,7 @@ def train_on_meta_set(
 
         nn.utils.clip_grad_norm_(update_rule.parameters(), 1)
         optimizer.step()
-        # optimizer.zero_grad()
+        optimizer.zero_grad()
         if verbose:
             print(f"""\r 
                 Epoch {epoch * training_params["batch_size"]} |

@@ -53,7 +53,7 @@ def add_reverse_edges(edges):
     return torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0).transpose(0,1)
 
 
-def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="dense"):
+def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="dense", input_mode="dense"):
     """
     Builds edges like 2d_grid_graph
     """
@@ -75,23 +75,24 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     
     # edges = torch.concat((torch.tensor([[0,3], [3,0], [4,7], [7,4]]), edges))
 
-    
-    #input neurons
-    input_edges = torch.tensor([
-        [
-            [x, (height*width) + y] for x in range(width)
-        ] for y in range(n_inputs)
-    ]).view(-1, 2)
-    # input_edges = torch.tensor([[[x, (height*width) + x] for x in range(width)]]).view(-1, 2)
-    
-    #output neurons
-    output_edges = torch.tensor([
-        [
-            [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
-        ] for y in range(n_outputs)
-    ]).view(-1, 2)
-    # output_edges = torch.tensor([[[(height*width)-(x+1), (height*width) + x+n_inputs] for x in range(width)]]).view(-1, 2)
-
+    if input_mode == "dense":
+        #input neurons
+        input_edges = torch.tensor([
+            [
+                [x, (height*width) + y] for x in range(width)
+            ] for y in range(n_inputs)
+        ]).view(-1, 2)
+        #output neurons
+        output_edges = torch.tensor([
+            [
+                [(height*width)-(x+1), (height*width) + y+n_inputs] for x in range(width)
+            ] for y in range(n_outputs)
+        ]).view(-1, 2)
+    elif input_mode == "grid":
+        input_edges = torch.tensor([[[x, (height*width) + x] for x in range(width)]]).view(-1, 2)
+        output_edges = torch.tensor([[[(height*width)-(x+1), (height*width) + x+n_inputs] for x in range(width)]]).view(-1, 2)
+    else:
+        raise ValueError("input_mode must be either 'grid' or 'dense'")
 
     input_edges = add_reverse_edges(input_edges)
     output_edges = add_reverse_edges(output_edges)
