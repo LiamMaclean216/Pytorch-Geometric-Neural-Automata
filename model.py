@@ -1,7 +1,7 @@
 from locale import normalize
 from turtle import forward
-from torch_geometric.nn import GCNConv, Sequential, SAGEConv
-from layers import GATConv
+from torch_geometric.nn import GCNConv, Sequential, SAGEConv, GATConv
+# from layers import GATConv
 from torch_geometric.nn.norm import LayerNorm, PairNorm, MeanSubtractionNorm
 # from torch_geometric.nn.aggr import LSTMAggregation, Aggregation
 from typing import Optional
@@ -61,7 +61,7 @@ class SelfAttnAggregation(Aggregation):
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
         self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True)
-        self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True)
+        # self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True)
 
 
         self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
@@ -75,11 +75,11 @@ class SelfAttnAggregation(Aggregation):
 
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-
+        print(x.shape)
         #adding directionality increases stability with more nodes
         x = torch.concat((
             x,
-            one_hot(torch.arange(x.shape[1]), x.shape[1]).unsqueeze(0).repeat(x.shape[0],1,1)
+            one_hot(torch.arange(x.shape[1]), x.shape[1]).unsqueeze(0).repeat(x.shape[0],1,1).to(cuda_device)
         ), -1)
 
         x = torch.nn.functional.pad(x, (0, self.in_channels - x.shape[2]), "constant", 0)
@@ -88,7 +88,7 @@ class SelfAttnAggregation(Aggregation):
         # update = self.attention_update(x, x, x)[0]
 
         #self attention on x
-        x = x + ((self.attention1(x, x, x)[0] + self.attention2(x, x, x)[0]))# * update.sigmoid())
+        x = x + ((self.attention1(x, x, x)[0]))# + self.attention2(x, x, x)[0]))# * update.sigmoid())
 
         
 
@@ -176,13 +176,20 @@ class UpdateRule(torch.nn.Module):
 
         # aggr = SelfAttnAggregation(network_width)#'max'
         
-        kwargs = {'add_self_loops': True}
-
-        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(self.total_hidden_dim, heads), **kwargs)
+        kwargs = {'add_self_loops': True, 'normalize':True}
+        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
-        self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
+
+
+        # kwargs = {'add_self_loops': True, 'project': False, 'normalize':True, 'root_weight': True}
+        # self.conv1 = SAGEConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(self.total_hidden_dim+2, heads), **kwargs)
+        # self.conv2 = SAGEConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv3 = SAGEConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv4 = SAGEConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv_out = SAGEConv(network_width, hidden_dim, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
     
         # self.conv1 = GATConv(self.total_hidden_dim+2, network_width, heads = heads, edge_dim = edge_dim, fill_value=fill_value)
         # self.conv2 = GATConv(network_width*heads, network_width, heads = heads, edge_dim = edge_dim, fill_value=fill_value)
@@ -228,7 +235,7 @@ class UpdateRule(torch.nn.Module):
         
         #initial state is all zeros
         if build:
-            self.initial = torch.zeros([height*width + self.n_outputs + self.n_inputs, self.total_hidden_dim])
+            self.initial = torch.zeros([height*width + self.n_outputs + self.n_inputs, self.total_hidden_dim]).to(cuda_device)
 
 
         #trained initial on only input and output nodes
@@ -264,7 +271,7 @@ class UpdateRule(torch.nn.Module):
         edges = build_edges(self.n_inputs, self.n_outputs, height, width, mode=mode, input_mode=input_mode)
         
         self.graph = Data(edge_index=edges, x=torch.zeros(n_nodes, self.total_hidden_dim))
-        self.edge_index = self.graph.edge_index.long().clone()
+        self.edge_index = self.graph.edge_index.long().clone().to(cuda_device)
         
         self.edge_attr = None
         if self.edge_dim is not None:
@@ -287,7 +294,7 @@ class UpdateRule(torch.nn.Module):
     
     
     def vectorise_input(self, x, input_data):
-        mask = torch.zeros_like(x)
+        mask = torch.zeros_like(x).to(cuda_device)
         
         mask[
                 -(self.n_inputs+self.n_outputs):-self.n_outputs, :self.input_vector_size
@@ -298,7 +305,7 @@ class UpdateRule(torch.nn.Module):
         return x
             
     def vectorize_output(self, x, input_data):
-        mask = torch.zeros_like(x)
+        mask = torch.zeros_like(x).to(cuda_device)
         
         mask[
                 -self.n_outputs:, :self.input_vector_size
@@ -308,7 +315,6 @@ class UpdateRule(torch.nn.Module):
         return x
     
     def forward(self, x, n_steps, data, plug_output_data = False, return_all = True, edge_index=None, edge_attr = None, last_idx = 1):
-
         network_in = []
         network_out = []
         
@@ -316,13 +322,15 @@ class UpdateRule(torch.nn.Module):
             last = idx == last_idx#len(data) - 1
             # network_in.append(problem_data_x.float().squeeze(0).numpy())
             # network_out.append(problem_data_y.float().squeeze(0).numpy())
-            problem_data_y_ = problem_data_y.float().to(cuda_device).unsqueeze(-1) 
+            
+            problem_data_y = problem_data_y
+            problem_data_y_ = problem_data_y.float().unsqueeze(-1) 
             problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)), dim = 2)
             
             
             
             # problem_data_x = problem_data_x.repeat(n_steps, 1)#.unsqueeze(0).transpose(1,2)
-            input_data = problem_data_x.float().unsqueeze(-1).to(cuda_device)
+            input_data = problem_data_x.float().unsqueeze(-1)
             
             # if last:
             
@@ -331,7 +339,7 @@ class UpdateRule(torch.nn.Module):
             if not last:
                 x = self.vectorize_output(x, problem_data_y_)
             else:
-                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_))
+                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_).to(cuda_device))
             
             x = self.vectorise_input(x, input_data)
                 
@@ -363,8 +371,8 @@ class UpdateRule(torch.nn.Module):
             return (
                 x, 
                 loss, 
-                network_output.detach().numpy(),
-                problem_data_y.float().squeeze(0).numpy(), 
+                network_output.cpu().detach().numpy(),
+                problem_data_y.cpu().float().squeeze(0).numpy(), 
                 # problem_data_x.float().squeeze(0).numpy()
                 # np.array(network_in),
                 np.array(network_out)
@@ -427,10 +435,10 @@ class UpdateRule(torch.nn.Module):
         x = x[:, :-2] + updatet #* update
 
         # in the last dimension of x, set an value greater than 1 or less than -1 to 0
-        x[:, -1][x[:, -1] > 1] = 0
-        x[:, -1][x[:, -1] < -1] = 0
+        # x[:, -1][x[:, -1] > 1] = 0
+        # x[:, -1][x[:, -1] < -1] = 0
 
-        x = x / 2
+        # x = x / 2
         
         return x
     
