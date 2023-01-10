@@ -75,7 +75,6 @@ class SelfAttnAggregation(Aggregation):
 
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-        print(x.shape)
         #adding directionality increases stability with more nodes
         x = torch.concat((
             x,
@@ -177,7 +176,7 @@ class UpdateRule(torch.nn.Module):
         # aggr = SelfAttnAggregation(network_width)#'max'
         
         kwargs = {'add_self_loops': True, 'normalize':True}
-        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
+        self.conv1 = GCNConv(self.total_hidden_dim, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
@@ -262,15 +261,16 @@ class UpdateRule(torch.nn.Module):
         self.initial_state(height, width, build=True)
         self.width = width
         self.height = height
+        self.n_non_io_nodes = width * height
         
         # Build initial state
-        n_nodes = height*width + self.n_inputs + self.n_outputs
+        self.n_nodes = height*width + self.n_inputs + self.n_outputs
         # self.initial = nn.parameter.Parameter(torch.zeros([n_nodes, self.total_hidden_dim]), requires_grad=True)
         
         # Build graph
         edges = build_edges(self.n_inputs, self.n_outputs, height, width, mode=mode, input_mode=input_mode)
-        
-        self.graph = Data(edge_index=edges, x=torch.zeros(n_nodes, self.total_hidden_dim))
+        print(edges)
+        self.graph = Data(edge_index=edges, x=torch.zeros(self.n_nodes, self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone().to(cuda_device)
         
         self.edge_attr = None
@@ -294,73 +294,74 @@ class UpdateRule(torch.nn.Module):
     
     
     def vectorise_input(self, x, input_data):
-        mask = torch.zeros_like(x).to(cuda_device)
         
-        mask[
-                -(self.n_inputs+self.n_outputs):-self.n_outputs, :self.input_vector_size
-            ] = self.input_vectorizer(input_data).squeeze(-1)
+        vectorized_input = self.input_vectorizer(input_data)
+        
+        mask = torch.zeros_like(x).to(cuda_device)
+        for i in range(mask.shape[0]//self.n_nodes):
+            mask[
+                    self.n_non_io_nodes+(i*self.n_nodes):self.n_non_io_nodes+self.n_outputs+(i*self.n_nodes), :self.input_vector_size
+                ] = vectorized_input[i]
+        
+        # print(x.shape)
+        # print(x)
         
         x = x + mask
-
+        # print(x)
         return x
             
     def vectorize_output(self, x, input_data):
-        mask = torch.zeros_like(x).to(cuda_device)
+        vectorized_output = self.reverse_output_vectorizer(input_data)
         
-        mask[
-                -self.n_outputs:, :self.input_vector_size
-            ] = self.reverse_output_vectorizer(input_data).squeeze(-1)
-
+        mask = torch.zeros_like(x).to(cuda_device)
+        for i in range(mask.shape[0]//self.n_nodes):
+            mask[
+                    (self.n_non_io_nodes) + self.n_outputs + (i*self.n_nodes): self.n_nodes + (i*self.n_nodes), :self.input_vector_size
+                ] = vectorized_output[i]
+            
         x = x + mask
         return x
     
-    def forward(self, x, n_steps, data, plug_output_data = False, return_all = True, edge_index=None, edge_attr = None, last_idx = 1):
+    def forward(
+        self, x, n_steps, data, return_all = True, edge_attr = None, edge_index = None, last_idx = 1, batch=None
+    ):
         network_in = []
         network_out = []
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
+            # print(problem_data_x, problem_data_y)
             last = idx == last_idx#len(data) - 1
-            # network_in.append(problem_data_x.float().squeeze(0).numpy())
-            # network_out.append(problem_data_y.float().squeeze(0).numpy())
-            
-            problem_data_y = problem_data_y
+            # print(problem_data_x)
+            # problem_data_y = torch.concat((problem_data_y,problem_data_y), 0)
             problem_data_y_ = problem_data_y.float().unsqueeze(-1) 
-            problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)), dim = 2)
-            
-            
-            
-            # problem_data_x = problem_data_x.repeat(n_steps, 1)#.unsqueeze(0).transpose(1,2)
+            # problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)), dim = 2)
             input_data = problem_data_x.float().unsqueeze(-1)
+            # print(input_data, problem_data_y_)
             
-            # if last:
+            # input_data = torch.concat((input_data,input_data), 0)
             
-            # print(input_data)
-            
-            if not last:
-                x = self.vectorize_output(x, problem_data_y_)
-            else:
-                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_).to(cuda_device))
+            # if not last:
+            #     x = self.vectorize_output(x, problem_data_y_)
+            # else:
+            #     x = self.vectorize_output(x, torch.zeros_like(problem_data_y_).to(cuda_device))
             
             x = self.vectorise_input(x, input_data)
                 
             for _ in range(n_steps):
-                
-                if not last:
-                    x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                    x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                else:
-                    x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                    x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
-                x = self.step(x, edge_attr=edge_attr, edge_index=edge_index)
+                # if not last:
+                #     x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                #     x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                # else:
+                #     x = torch.cat((torch.ones([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                #     x = torch.cat((torch.zeros([x.shape[0], 1]).to(cuda_device), x), dim = 1)
+                x = self.step(x, edge_attr=edge_attr, edge_index=edge_index, batch=batch)
             
             if last:
                 break
             # break
 
-        # print(problem_data_y)    
-        # print("#################")    
         network_output = self.get_output(x)
-        loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float().squeeze(0))
+        loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
         
         #l2 loss
         # loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
@@ -372,9 +373,7 @@ class UpdateRule(torch.nn.Module):
                 x, 
                 loss, 
                 network_output.cpu().detach().numpy(),
-                problem_data_y.cpu().float().squeeze(0).numpy(), 
-                # problem_data_x.float().squeeze(0).numpy()
-                # np.array(network_in),
+                problem_data_y.cpu().float().numpy(), 
                 np.array(network_out)
             )
         
@@ -390,11 +389,13 @@ class UpdateRule(torch.nn.Module):
         return x
         
     
-    def step(self, x, edge_attr = None, edge_index = None):
+    def step(self, x, edge_attr = None, edge_index = None, batch=None):
         if edge_index is None:
             edge_index = self.edge_index
         
-        
+        # for i in x:
+        #     print(i)
+        # print("#######")
         # forgor = self.forgor1(x).sigmoid()
         # forgor = self.forgor2(forgor).sigmoid()
         # x = (x * forgor) + (
@@ -420,10 +421,10 @@ class UpdateRule(torch.nn.Module):
 
         edge_weight = self.get_edge_weight()#None
         updatet = self.conv1(x, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
-        updatet = self.layer_norm1(updatet)
+        updatet = self.layer_norm1(updatet, batch=batch)
         updatet = self.relu(updatet)
         updatet = self.conv2(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
-        updatet = self.layer_norm2(updatet)
+        updatet = self.layer_norm2(updatet, batch=batch)
         updatet = self.relu(updatet)
         # updatet = self.conv3(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
         # updatet = self.layer_norm3(updatet)
@@ -432,7 +433,8 @@ class UpdateRule(torch.nn.Module):
 
 
         # updatet = self.conv_out(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr).tanh()
-        x = x[:, :-2] + updatet #* update
+        x = x + updatet #* update
+        # x = x[:, :-2] + updatet #* update
 
         # in the last dimension of x, set an value greater than 1 or less than -1 to 0
         # x[:, -1][x[:, -1] > 1] = 0
@@ -451,12 +453,25 @@ class UpdateRule(torch.nn.Module):
         """
         
         # output = self.output_vectorizer(x[-self.n_outputs:, :self.hidden_dim]).squeeze(-1)
-        output = self.output_vectorizer(x[-self.n_outputs:, :3]).squeeze(-1)
+        # output = self.output_vectorizer(x[-self.n_outputs:, :3]).squeeze(-1)
+        
+        outputs = []
+        for i in range(x.shape[0]//self.n_nodes):
+            outputs.append(
+                self.output_vectorizer
+                (
+                x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :3]
+            ).squeeze(-1))
+            
+        output = torch.stack(outputs)
+        # print(x)
+        # print(output)
         
         if softmax:
             output = output.softmax(-1)
         
-        return output
+        # print(x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :3])
+        return output#.squeeze(0)
         
     
     def reset(self):

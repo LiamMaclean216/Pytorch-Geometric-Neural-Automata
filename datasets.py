@@ -167,8 +167,8 @@ class MetaDataset():
     def n_outputs(self):
         return self.datasets[0].target.shape[1]
     
-    def get_set(self, n):
-        return DataLoader(self.datasets[n] , batch_size=1, shuffle=True)
+    def get_set(self, n, batch_size=1):
+        return DataLoader(self.datasets[n] , batch_size=batch_size, shuffle=True)
     
     def get_set_size(self):
         return len(self.datasets[0])

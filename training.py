@@ -3,7 +3,8 @@ import numpy as np
 import torch.nn as nn
 import torch
 import wandb
-
+from torch_geometric.loader import DataLoader
+import copy
 # numpy only displays 3 decimal places
 np.set_printoptions(precision=3)
 
@@ -38,22 +39,30 @@ def train_on_meta_set(
     loss_integral = 0
     for epoch in range(training_params["n_epochs"]):
         loss = 0
-        accuracy = 0
-        for _ in range(training_params["batch_size"]):
-            for set_idx in meta_set.iterate():
+        # accuracy = 0
+        # for _ in range(15):#range(training_params["batch_size"]):
+        for set_idx in meta_set.iterate():
+            update_rule.reset()
+            x = update_rule.initial_state().repeat(training_params["batch_size"], 1)
+            # loader = DataLoader([copy.deepcopy(update_rule.graph), copy.deepcopy(update_rule.graph),copy.deepcopy(update_rule.graph)] , batch_size = training_params["batch_size"])
+            # loader = DataLoader([copy.deepcopy(update_rule.graph), copy.deepcopy(update_rule.graph)] , batch_size = training_params["batch_size"])
+            
+            loader = DataLoader([update_rule.graph]*training_params["batch_size"], batch_size = training_params["batch_size"])
+            
+            graph = loader.__iter__().__next__()
+            
+            x, batch_loss, network_output, correct, network_in = update_rule(
+                x, training_params["n_steps"], meta_set.get_set(set_idx, training_params["batch_size"]), 
+                edge_attr=edge_attr, edge_index=graph.edge_index, batch=graph.batch, **forward_kwargs
+            )
+            loss += batch_loss
 
-                update_rule.reset()
-                x = update_rule.initial_state()
-
-                x, batch_loss, network_output, correct, network_in = update_rule(
-                    x, training_params["n_steps"], meta_set.get_set(set_idx), edge_attr=edge_attr, edge_index=edge_index, **forward_kwargs
-                )
-                loss += batch_loss
-
-            accuracy += ((network_output.round()) == correct).all()
+        # print(network_output.round(), correct)
+        
+        accuracy = (network_output.argmax(1) == correct.argmax(1)).sum().item() / training_params["batch_size"]
 
         loss /= training_params["batch_size"]
-        accuracy /= training_params["batch_size"]
+        # accuracy /= training_params["batch_size"]
 
         if wandb_log:
             wandb.log(
