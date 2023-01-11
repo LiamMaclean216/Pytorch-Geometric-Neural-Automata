@@ -15,7 +15,8 @@ from torch_geometric.data import Data
 def train_on_meta_set(
     update_rule, 
     optimizer, 
-    meta_set, 
+    training_set, 
+    testing_set,
     training_params: dict, 
     edge_attr=None, 
     verbose=True, 
@@ -49,34 +50,21 @@ def train_on_meta_set(
     tmp = edge_index[0].clone()
     edge_index[0] = edge_index[1]
     edge_index[1] = tmp
+    
+    edge_index_test = utils.sort_edge_index(update_rule.edge_index).to(device)
+    tmp = edge_index_test[0].clone()
+    edge_index_test[0] = edge_index_test[1]
+    edge_index_test[1] = tmp
+    
         
     for epoch in range(training_params["n_epochs"]):
-        loss = 0
-        # accuracy = 0
-        # for _ in range(15):#range(training_params["batch_size"]):
-        # for set_idx in meta_set.iterate():
         update_rule.reset()
         x = update_rule.initial_state().repeat(training_params["batch_size"], 1)
-        # loader = DataLoader([copy.deepcopy(update_rule.graph), copy.deepcopy(update_rule.graph),copy.deepcopy(update_rule.graph)] , batch_size = training_params["batch_size"])
-        # loader = DataLoader([copy.deepcopy(update_rule.graph), copy.deepcopy(update_rule.graph)] , batch_size = training_params["batch_size"])
-        
-        
-        
-        # graph.edge_index = edge_index
-        # nx.draw(utils.to_networkx(graph, to_undirected=False, remove_self_loops = True))
-        
-        x, batch_loss, network_output, correct, network_in = update_rule(
-            x, training_params["n_steps"], meta_set, 
+        x, loss, network_output, correct, network_in = update_rule(
+            x, training_params["n_steps"], training_set, 
             edge_attr=edge_attr, edge_index=edge_index, batch=graph.batch, **forward_kwargs
         )
-        loss += batch_loss
-
-        # print(network_output.round(), correct)
-        
         accuracy = (network_output.argmax(1) == correct.argmax(1)).sum().item() / training_params["batch_size"]
-
-        loss /= training_params["batch_size"]
-        # accuracy /= training_params["batch_size"]
 
         if wandb_log:
             wandb.log(
@@ -90,15 +78,23 @@ def train_on_meta_set(
         nn.utils.clip_grad_norm_(update_rule.parameters(), 1)
         optimizer.step()
         optimizer.zero_grad()
-        if verbose and epoch % 20 == 0:
+        if verbose and epoch % 50 == 0:
+            x = update_rule.initial_state()#.repeat(training_params["batch_size"], 1)
+            _, test_loss, network_output, correct, _ = update_rule(
+                x, training_params["n_steps"], testing_set, 
+                edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
+            )
+            test_accuracy = (network_output.argmax(1) == correct.argmax(1)).sum().item()
+            
             print(f"""\r 
                 Epoch {epoch } |
                 Loss {loss:.6} |
                 Accuracy {int(accuracy * 100)}% |
-                Network out: {network_output[0]} |
-                Correct:  {correct[0]} |
-                Network In: {network_in}
+                Test Loss {test_loss:.6} |
+                Test Accuracy {int(test_accuracy * 100)}% |
                 """.replace("\n", " ").replace("            ", ""), end="")
+                # Network out: {network_output[0]} |
+                # Correct:  {correct[0]} |
             if epoch % 100 == 0:
                 print()
         

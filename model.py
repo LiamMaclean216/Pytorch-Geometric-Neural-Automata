@@ -291,7 +291,6 @@ class UpdateRule(torch.nn.Module):
         #l2 loss
         # loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
         
-        loss /= len(data)
         
         if return_all:
             return (
@@ -350,10 +349,10 @@ class UpdateRule(torch.nn.Module):
         x = x[:, :-2] + updatet #* update
 
         # in the last dimension of x, set an value greater than 1 or less than -1 to 0
-        # x[:, -1][x[:, -1] > 1] = 0
-        # x[:, -1][x[:, -1] < -1] = 0
+        x[:, -1][x[:, -1] > 1] = 0
+        x[:, -1][x[:, -1] < -1] = 0
 
-        # x = x / 2
+        x = x / 2
         
         return x
     
