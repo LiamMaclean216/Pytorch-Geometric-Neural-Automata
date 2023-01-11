@@ -54,18 +54,29 @@ class Dataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.data)    
+    
+    def shuffle(self):
+        """
+        shuffle data and targets together
+        """
+        new_idx = torch.randperm(len(self.data))
+        self.data = self.data[new_idx]
+        self.target = self.target[new_idx]
+        
+        #return a copy of self
+        return Dataset(self.data, self.target)        
 
 
 class TranslateDataset(Dataset):
     def __init__(self, diff=1, drops = None, n=3) -> None:
-        # cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
-        cuda_device = torch.device("cpu")
+        cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
+        # cuda_device = torch.device("cpu")
         
         if drops is None:
             drops = [random.randint(1, n-1)]
         # drops = [3]
         
-        arr = torch.arange(n).to(cuda_device)
+        arr = torch.arange(n)
         
 
         # for drop in drops:
@@ -116,8 +127,6 @@ class TimeDataset4(Dataset):
         self.data = torch.tensor([[1,1], [0,1], [0,0]])
         self.target = torch.tensor([[0,0,0,0], [0,0,0,0],[0,0,0,1]])
         
-
-                            
 class TDataset1(Dataset):
     def __init__(self):
         self.data = torch.tensor([[0,1,0,1], [1,0,1,0]])
