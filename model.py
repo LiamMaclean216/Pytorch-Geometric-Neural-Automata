@@ -82,7 +82,7 @@ class UpdateRule(torch.nn.Module):
                 ):
         
         super(UpdateRule, self).__init__()
-        # torch.manual_seed(12345)
+        torch.manual_seed(12345)
         self.cuda_device = cuda_device
         self.edge_dim = edge_dim
         self.n_inputs = n_inputs
@@ -320,12 +320,12 @@ class UpdateRule(torch.nn.Module):
         # for i in x:
         #     print(i)
         # print("#######")
-        # forgor = self.forgor1(x).sigmoid()
-        # forgor = self.forgor2(forgor).sigmoid()
-        # x = (x * forgor) + (
-        #     (1 - forgor) * torch.cat(
-        #         (self.initial_state(), torch.zeros([self.initial_state().shape[0], 2]).to(self.cuda_device))
-        #         , dim = -1))
+        forgor = self.forgor1(x).sigmoid()
+        forgor = self.forgor2(forgor).sigmoid()
+        x = (x * forgor) + (
+            (1 - forgor) * torch.cat(
+                (self.initial_state(), torch.zeros([self.initial_state().shape[0], 2]).to(self.cuda_device))
+                , dim = -1))
 
         # update = self.update1(x).sigmoid()
         # update = self.update2(update).sigmoid() 
