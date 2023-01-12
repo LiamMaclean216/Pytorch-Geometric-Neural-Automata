@@ -22,7 +22,7 @@ class SelfAttnAggregation(Aggregation):
         super().__init__()
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
-        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True)
+        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0.3)
         # self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True)
 
 
@@ -148,7 +148,7 @@ class UpdateRule(torch.nn.Module):
         self.update1 = nn.Linear(network_width+2, network_width)
         self.update2 = nn.Linear(network_width, hidden_dim)
         
-        
+        self.dropout = nn.Dropout(0.2)
 
         self.reset()
 

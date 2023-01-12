@@ -61,7 +61,7 @@ def train_on_meta_set(
     for epoch in range(training_params["n_epochs"]):
         update_rule.reset()
         x = update_rule.initial_state().repeat(training_params["batch_size"], 1)
-        x, loss, network_output, correct, network_in = update_rule(
+        x, loss, network_output, correct, network_in = update_rule.train()(
             x, training_params["n_steps"], training_set, 
             edge_attr=edge_attr, edge_index=edge_index, batch=graph.batch, **forward_kwargs
         )
@@ -76,7 +76,7 @@ def train_on_meta_set(
         optimizer.zero_grad()
         if verbose and epoch % 50 == 0:
             x = update_rule.initial_state().repeat(testing_set.batch_size, 1)
-            _, test_loss, network_output_, correct_, _ = update_rule(
+            _, test_loss, network_output_, correct_, _ = update_rule.eval()(
                 x, training_params["n_steps"], testing_set, 
                 edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
             )
