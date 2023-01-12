@@ -352,7 +352,7 @@ class UpdateRule(torch.nn.Module):
         x[:, -1][x[:, -1] > 1] = 0
         x[:, -1][x[:, -1] < -1] = 0
 
-        # x = x / 2
+        x = x / 2
         
         return x
     
