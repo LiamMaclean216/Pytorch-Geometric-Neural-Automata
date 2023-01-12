@@ -286,10 +286,10 @@ class UpdateRule(torch.nn.Module):
             # break
 
         network_output = self.get_output(x)
-        loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
+        # loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
         
         #l2 loss
-        # loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
+        loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
         
         
         if return_all:
@@ -352,7 +352,7 @@ class UpdateRule(torch.nn.Module):
         # x[:, -1][x[:, -1] > 1] = 0
         # x[:, -1][x[:, -1] < -1] = 0
 
-        # x = x / 2
+        x = x / 2
         
         return x
     

@@ -89,7 +89,10 @@ def train_on_meta_set(
                 x, training_params["n_steps"], testing_set, 
                 edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
             )
-            test_accuracy = (network_output_.argmax(1) == correct_.argmax(1)).sum().item() / network_output.shape[1]
+            # test_accuracy = (network_output_.argmax(1) == correct_.argmax(1)).sum().item() / network_output.shape[1]
+            test_accuracy = ((network_output_.round() == correct_).sum().item() / testing_set.batch_size) / network_output_.shape[1]
+
+            
             log["test loss"] = test_loss
             log["test acc"] = test_accuracy
         
