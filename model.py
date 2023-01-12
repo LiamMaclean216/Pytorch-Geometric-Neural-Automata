@@ -320,12 +320,12 @@ class UpdateRule(torch.nn.Module):
         # for i in x:
         #     print(i)
         # print("#######")
-        forgor = self.forgor1(x).sigmoid()
-        forgor = self.forgor2(forgor).sigmoid()
-        x = (x * forgor) + (
-            (1 - forgor) * torch.cat(
-                (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
-                , dim = -1))
+        # forgor = self.forgor1(x).sigmoid()
+        # forgor = self.forgor2(forgor).sigmoid()
+        # x = (x * forgor) + (
+        #     (1 - forgor) * torch.cat(
+        #         (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
+        #         , dim = -1))
 
         # update = self.update1(x).sigmoid()
         # update = self.update2(update).sigmoid() 
