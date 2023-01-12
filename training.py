@@ -50,12 +50,12 @@ def train_on_meta_set(
     edge_index[0] = edge_index[1]
     edge_index[1] = tmp
     
-    loader = DataLoader([update_rule.graph]*testing_set.batch_size, batch_size = testing_set.batch_size)
     
-    edge_index_test = utils.sort_edge_index(update_rule.edge_index).to(device)
-    tmp = edge_index_test[0].clone()
-    edge_index_test[0] = edge_index_test[1]
-    edge_index_test[1] = tmp
+    if testing_set:
+        edge_index_test = utils.sort_edge_index(update_rule.edge_index).to(device)
+        tmp = edge_index_test[0].clone()
+        edge_index_test[0] = edge_index_test[1]
+        edge_index_test[1] = tmp
     
         
     for epoch in range(training_params["n_epochs"]):
@@ -95,16 +95,23 @@ def train_on_meta_set(
                 step=epoch,
             )
         
-        
-        print(f"""\r 
+        out_string = f"""\r 
             Epoch {epoch } |
             Loss {loss:.6} |
             Accuracy {int(accuracy * 100)}% |
             Network out: {network_output[0]} |
-            Correct:  {correct[0]} |
+            Correct:  {correct[0]}
+            """
+        
+        # Test Loss {test_loss:.6} |
+        #     Test Accuracy {int(test_accuracy * 100)}% |
+        if testing_set:
+            out_string += f"""
             Test Loss {test_loss:.6} |
             Test Accuracy {int(test_accuracy * 100)}% |
-            """.replace("\n", " ").replace("            ", ""), end="")
+            """
+        
+        print(out_string.replace("\n", " ").replace("            ", ""), end="")
         if epoch % 100 == 0:
             print()
     
