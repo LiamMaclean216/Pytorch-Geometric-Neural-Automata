@@ -349,10 +349,10 @@ class UpdateRule(torch.nn.Module):
         x = x[:, :-2] + updatet #* update
 
         # temporal nonlinearity
-        # x[:, -1][x[:, -1] > 1] = 0
-        # x[:, -1][x[:, -1] < -1] = 0
+        x[:, -1][x[:, -1] > 1] = 0
+        x[:, -1][x[:, -1] < -1] = 0
 
-        x = x / 2
+        # x = x / 2
         
         return x
     
