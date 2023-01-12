@@ -380,7 +380,7 @@ class UpdateRule(torch.nn.Module):
         # print(output)
         
         if softmax:
-            output = output.softmax(-1)
+            output = output.sigmoid()#.softmax(-1)
         # print(output)
         
         # print(x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :3])

@@ -46,8 +46,10 @@ class Dataset(torch.utils.data.Dataset):
     datset superclass
     """
     def __init__(self, data, target):
-        self.data = data
-        self.target = target
+        cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
+        
+        self.data = torch.tensor(data).to(cuda_device)
+        self.target = torch.tensor(target).to(cuda_device)
         
     def __getitem__(self, index):
         return self.data[index], self.target[index]
@@ -69,7 +71,6 @@ class Dataset(torch.utils.data.Dataset):
 
 class TranslateDataset(Dataset):
     def __init__(self, diff=1, drops = None, n=3) -> None:
-        cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
         # cuda_device = torch.device("cpu")
         
         if drops is None:
@@ -85,8 +86,8 @@ class TranslateDataset(Dataset):
         test = random.randint(1, n-1)
         # arr = torch.tensor([test, test])
         
-        data = one_hot(arr, n).to(cuda_device)
-        targets = one_hot((arr+diff)%n, n).to(cuda_device)
+        data = one_hot(arr, n)
+        targets = one_hot((arr+diff)%n, n)
         
         
         # data =  torch.concat((data, data), 0)
