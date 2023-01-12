@@ -348,11 +348,11 @@ class UpdateRule(torch.nn.Module):
         # x = x + updatet #* update
         x = x[:, :-2] + updatet #* update
 
-        # in the last dimension of x, set an value greater than 1 or less than -1 to 0
-        x[:, -1][x[:, -1] > 1] = 0
-        x[:, -1][x[:, -1] < -1] = 0
+        # temporal nonlinearity
+        # x[:, -1][x[:, -1] > 1] = 0
+        # x[:, -1][x[:, -1] < -1] = 0
 
-        x = x / 2
+        # x = x / 2
         
         return x
     
