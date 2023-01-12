@@ -80,7 +80,9 @@ def train_on_meta_set(
             
         if not (verbose and epoch % 50 == 0):
             continue
-    
+            
+        log = {"training loss": loss, "training acc": accuracy}
+        
         if testing_set:
             x = update_rule.initial_state().repeat(testing_set.batch_size, 1)
             _, test_loss, network_output_, correct_, _ = update_rule.eval()(
@@ -88,10 +90,12 @@ def train_on_meta_set(
                 edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
             )
             test_accuracy = (network_output_.argmax(1) == correct_.argmax(1)).sum().item() / network_output.shape[1]
+            log["test loss"] = test_loss
+            log["test acc"] = test_accuracy
         
         if wandb_log:
             wandb.log(
-                {"training loss": loss, "training acc": accuracy, "test loss": test_loss, "test acc": test_accuracy}, 
+                log,
                 step=epoch,
             )
         
@@ -101,7 +105,7 @@ def train_on_meta_set(
             Accuracy {int(accuracy * 100)}% |
             Network out: {network_output[0]} |
             Correct:  {correct[0]}
-            """
+            """.replace("\n", " ").replace("            ", "")
         
         # Test Loss {test_loss:.6} |
         #     Test Accuracy {int(test_accuracy * 100)}% |
@@ -109,9 +113,9 @@ def train_on_meta_set(
             out_string += f"""
             Test Loss {test_loss:.6} |
             Test Accuracy {int(test_accuracy * 100)}% |
-            """
+            """.replace("\n", " ").replace("            ", "")
         
-        print(out_string.replace("\n", " ").replace("            ", ""), end="")
+        print(out_string, end="")
         if epoch % 100 == 0:
             print()
     
