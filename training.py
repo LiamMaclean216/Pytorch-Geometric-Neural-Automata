@@ -74,33 +74,39 @@ def train_on_meta_set(
         nn.utils.clip_grad_norm_(update_rule.parameters(), 1)
         optimizer.step()
         optimizer.zero_grad()
-        if verbose and epoch % 50 == 0:
+        
+        if save_dir is not None and epoch % (100 // training_params["batch_size"]) == 0:
+            torch.save(update_rule.state_dict(), f"{save_dir}.pt")
+            
+        if not (verbose and epoch % 50 == 0):
+            continue
+    
+        if testing_set:
             x = update_rule.initial_state().repeat(testing_set.batch_size, 1)
             _, test_loss, network_output_, correct_, _ = update_rule.eval()(
                 x, training_params["n_steps"], testing_set, 
                 edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
             )
             test_accuracy = (network_output_.argmax(1) == correct_.argmax(1)).sum().item() / network_output.shape[1]
-            
-            if wandb_log:
-                wandb.log(
-                    {"training loss": loss, "training acc": accuracy, "test loss": test_loss, "test acc": test_accuracy}, 
-                    step=epoch,
-                )
-            
-            
-            print(f"""\r 
-                Epoch {epoch } |
-                Loss {loss:.6} |
-                Accuracy {int(accuracy * 100)}% |
-                Network out: {network_output[0]} |
-                Correct:  {correct[0]} |
-                Test Loss {test_loss:.6} |
-                Test Accuracy {int(test_accuracy * 100)}% |
-                """.replace("\n", " ").replace("            ", ""), end="")
-            if epoch % 100 == 0:
-                print()
         
-        if save_dir is not None and epoch % (100 // training_params["batch_size"]) == 0:
-            torch.save(update_rule.state_dict(), f"{save_dir}.pt")
+        if wandb_log:
+            wandb.log(
+                {"training loss": loss, "training acc": accuracy, "test loss": test_loss, "test acc": test_accuracy}, 
+                step=epoch,
+            )
+        
+        
+        print(f"""\r 
+            Epoch {epoch } |
+            Loss {loss:.6} |
+            Accuracy {int(accuracy * 100)}% |
+            Network out: {network_output[0]} |
+            Correct:  {correct[0]} |
+            Test Loss {test_loss:.6} |
+            Test Accuracy {int(test_accuracy * 100)}% |
+            """.replace("\n", " ").replace("            ", ""), end="")
+        if epoch % 100 == 0:
+            print()
+    
+        
 

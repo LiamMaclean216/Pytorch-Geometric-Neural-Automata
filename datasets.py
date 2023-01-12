@@ -71,30 +71,15 @@ class Dataset(torch.utils.data.Dataset):
 
 class TranslateDataset(Dataset):
     def __init__(self, diff=1, drops = None, n=3) -> None:
-        # cuda_device = torch.device("cpu")
-        
         if drops is None:
             drops = [random.randint(1, n-1)]
-        # drops = [3]
         
         arr = torch.arange(n)
-        
-
         # for drop in drops:
         #     arr = torch.cat([arr[:drop-1], arr[drop:]])
-
-        test = random.randint(1, n-1)
-        # arr = torch.tensor([test, test])
         
         data = one_hot(arr, n)
         targets = one_hot((arr+diff)%n, n)
-        
-        
-        # data =  torch.concat((data, data), 0)
-        # targets =  torch.concat((targets, targets), 0)
-        
-        
-        
         super().__init__(data, targets)
 
 
