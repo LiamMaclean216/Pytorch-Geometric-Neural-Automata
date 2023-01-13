@@ -22,8 +22,8 @@ class SelfAttnAggregation(Aggregation):
         super().__init__()
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
-        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0)
-        # self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True)
+        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0.15)
+        self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0.15)
 
 
         self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
@@ -47,7 +47,7 @@ class SelfAttnAggregation(Aggregation):
         # update = self.attention_update(x, x, x)[0]
 
         #self attention on x
-        x = x + ((self.attention1(x, x, x)[0]))# + self.attention2(x, x, x)[0]))# * update.sigmoid())
+        x = x + ((self.attention1(x, x, x)[0] + self.attention2(x, x, x)[0]))# * update.sigmoid())
 
         
 
@@ -289,7 +289,7 @@ class UpdateRule(torch.nn.Module):
         # loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
         
         #l2 loss
-        loss = F.mse_loss(network_output, problem_data_y.float().squeeze(0))
+        loss = F.mse_loss(network_output, problem_data_y.float())
         
         
         if return_all:
