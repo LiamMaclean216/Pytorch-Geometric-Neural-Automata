@@ -47,6 +47,7 @@ class Dataset(torch.utils.data.Dataset):
     """
     def __init__(self, data, target):
         cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
+        # cuda_device = torch.device("cpu")
         
         self.data = torch.tensor(data).to(cuda_device)
         self.target = torch.tensor(target).to(cuda_device)

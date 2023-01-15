@@ -1,7 +1,8 @@
 import torch
 import networkx as nx
 from torch_geometric.utils import grid, remove_self_loops, add_self_loops
-
+import random
+import numpy as np
 # type_dict = {"hidden": 0, "input": 1, "output": 2}
 type_dict = {"hidden": [1, 0, 0], "input": [0, 1, 0], "output": [0, 0, 1]}
 
@@ -116,3 +117,11 @@ def run_rule(data_x, update_rule, n_steps = 5):
         print(network_output)
     return network_output
     
+    
+def seed(seed):
+    random.seed(seed)                          
+    np.random.seed(seed)       
+    torch.manual_seed(seed)                    
+    torch.cuda.manual_seed(seed)               
+    torch.cuda.manual_seed_all(seed)           
+    torch.backends.cudnn.deterministic = True  
