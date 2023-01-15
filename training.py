@@ -116,6 +116,8 @@ def train_on_meta_set(
             out_string += f"""
             Test Loss {test_loss:.6} |
             Test Accuracy {int(test_accuracy * 100)}% |
+            Test Network out: {network_output_[0]} |
+            Test Correct:  {correct_[0]}
             """.replace("\n", " ").replace("            ", "")
         
         print(out_string, end="")

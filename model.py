@@ -22,8 +22,8 @@ class SelfAttnAggregation(Aggregation):
         super().__init__()
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
-        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0.15)
-        self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0.15)
+        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0)
+        self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0)
 
 
         self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
@@ -82,7 +82,7 @@ class UpdateRule(torch.nn.Module):
                 ):
         
         super(UpdateRule, self).__init__()
-        torch.manual_seed(12345)
+        seed(12345)
         self.cuda_device = cuda_device
         self.edge_dim = edge_dim
         self.n_inputs = n_inputs
@@ -400,3 +400,9 @@ class UpdateRule(torch.nn.Module):
         
         # self.edge_weight = torch.zeros([162, 1])
         
+
+def seed(seed):
+    torch.manual_seed(seed)                    
+    torch.cuda.manual_seed(seed)               
+    torch.cuda.manual_seed_all(seed)           
+    torch.backends.cudnn.deterministic = True  
