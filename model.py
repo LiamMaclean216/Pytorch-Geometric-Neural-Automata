@@ -319,15 +319,15 @@ class UpdateRule(torch.nn.Module):
         # for i in x:
         #     print(i)
         # print("#######")
-        forgor = self.forgor1(x).sigmoid()
-        forgor = self.forgor2(forgor).sigmoid()
-        x = (x * forgor) + (
-            (1 - forgor) * torch.cat(
-                (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
-                , dim = -1))
+        # forgor = self.forgor1(x).sigmoid()
+        # forgor = self.forgor2(forgor).sigmoid()
+        # x = (x * forgor) + (
+        #     (1 - forgor) * torch.cat(
+        #         (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
+        #         , dim = -1))
 
-        # update = self.update1(x).sigmoid()
-        # update = self.update2(update).sigmoid() 
+        update = self.update1(x).sigmoid()
+        update = self.update2(update).sigmoid() 
         
 
         edge_weight = None#self.get_edge_weight()#None
@@ -345,7 +345,7 @@ class UpdateRule(torch.nn.Module):
 
         # updatet = self.conv_out(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr).tanh()
         # x = x + updatet #* update
-        x = x[:, :-2] + updatet #* update
+        x = x[:, :-2] + updatet * update
 
         # temporal nonlinearity
         x[:, -1][x[:, -1] > 1] = 0
