@@ -23,9 +23,9 @@ class SelfAttnAggregation(Aggregation):
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
         self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        self.attention4 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        # self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        # self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        # self.attention4 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
         self.n_heads = n_heads
 
         # self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
@@ -53,11 +53,11 @@ class SelfAttnAggregation(Aggregation):
         # print(x_repeated.shape)
         # print(self.attention1(x_repeated,x_repeated,x_repeated)[0])
         x = x + (
-            self.attention1(x,x,x)[0] + 
-            self.attention2(x, x, x)[0] +
-            self.attention3(x, x, x)[0] +
-            self.attention4(x, x, x)[0]
-        ) 
+            self.attention1(x,x,x)[0])# + 
+        #     self.attention2(x, x, x)[0] +
+        #     self.attention3(x, x, x)[0] +
+        #     self.attention4(x, x, x)[0]
+        # ) 
 
         
 
@@ -157,8 +157,6 @@ class UpdateRule(torch.nn.Module):
         self.update1 = nn.Linear(network_width+2, network_width)
         self.update2 = nn.Linear(network_width, hidden_dim)
         
-        self.dropout = nn.Dropout(0.2)
-
         self.reset()
 
 
@@ -329,12 +327,12 @@ class UpdateRule(torch.nn.Module):
         # for i in x:
         #     print(i)
         # print("#######")
-        # forgor = self.forgor1(x).sigmoid()
-        # forgor = self.forgor2(forgor).sigmoid()
-        # x = (x * forgor) + (
-        #     (1 - forgor) * torch.cat(
-        #         (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
-        #         , dim = -1))
+        forgor = self.forgor1(x).sigmoid()
+        forgor = self.forgor2(forgor).sigmoid()
+        x = (x * forgor)# + (
+            # (1 - forgor) * torch.cat(
+            #     (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
+            #     , dim = -1))
 
         # update = self.update1(x).sigmoid()
         # update = self.update2(update).sigmoid() 
