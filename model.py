@@ -18,16 +18,18 @@ from torch_geometric.nn.aggr import Aggregation
 cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
 
 class SelfAttnAggregation(Aggregation):
-    def __init__(self, in_channels, heads = 1):
+    def __init__(self, in_channels, n_heads = 1):
         super().__init__()
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
-        self.attention1 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0)
-        self.attention2 = MultiheadAttention(self.in_channels, heads, batch_first=True, dropout=0)
+        self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
+        self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
+        self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
+        self.attention4 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
+        self.n_heads = n_heads
 
-
-        self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
-        self.attention_update = MultiheadAttention(self.in_channels, heads, batch_first=True)
+        # self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
+        # self.attention_update = MultiheadAttention(self.in_channels, heads, batch_first=True)
 
 
     def forward(self, x: Tensor, index: Optional[Tensor] = None,
@@ -47,7 +49,15 @@ class SelfAttnAggregation(Aggregation):
         # update = self.attention_update(x, x, x)[0]
 
         #self attention on x
-        x = x + ((self.attention1(x, x, x)[0] + self.attention2(x, x, x)[0]))# * update.sigmoid())
+        #repeat x for each head
+        # print(x_repeated.shape)
+        # print(self.attention1(x_repeated,x_repeated,x_repeated)[0])
+        x = x + (
+            self.attention1(x,x,x)[0] + 
+            self.attention2(x, x, x)[0] +
+            self.attention3(x, x, x)[0] +
+            self.attention4(x, x, x)[0]
+        ) 
 
         
 
@@ -326,8 +336,8 @@ class UpdateRule(torch.nn.Module):
         #         (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
         #         , dim = -1))
 
-        update = self.update1(x).sigmoid()
-        update = self.update2(update).sigmoid() 
+        # update = self.update1(x).sigmoid()
+        # update = self.update2(update).sigmoid() 
         
 
         edge_weight = None#self.get_edge_weight()#None
@@ -345,7 +355,7 @@ class UpdateRule(torch.nn.Module):
 
         # updatet = self.conv_out(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr).tanh()
         # x = x + updatet #* update
-        x = x[:, :-2] + updatet * update
+        x = x[:, :-2] + updatet# * update
 
         # temporal nonlinearity
         x[:, -1][x[:, -1] > 1] = 0
