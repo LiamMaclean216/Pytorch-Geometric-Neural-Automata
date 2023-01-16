@@ -23,9 +23,9 @@ class SelfAttnAggregation(Aggregation):
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
         self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        # self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        # self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        # self.attention4 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        self.attention4 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
         self.n_heads = n_heads
 
         # self.attention_fogor = MultiheadAttention(self.in_channels, heads, batch_first=True)
@@ -53,11 +53,11 @@ class SelfAttnAggregation(Aggregation):
         # print(x_repeated.shape)
         # print(self.attention1(x_repeated,x_repeated,x_repeated)[0])
         x = x + (
-            self.attention1(x,x,x)[0])# + 
-        #     self.attention2(x, x, x)[0] +
-        #     self.attention3(x, x, x)[0] +
-        #     self.attention4(x, x, x)[0]
-        # ) 
+            self.attention1(x,x,x)[0] + 
+            self.attention2(x, x, x)[0] +
+            self.attention3(x, x, x)[0] +
+            self.attention4(x, x, x)[0]
+        ) 
 
         
 
@@ -276,8 +276,8 @@ class UpdateRule(torch.nn.Module):
             else:
                 x = self.vectorize_output(x, torch.zeros_like(problem_data_y_).to(self.cuda_device))
             
+            x = self.vectorise_input(x, input_data)
             for _ in range(n_steps):
-                x = self.vectorise_input(x, input_data)
                 
                 #this makes a big difference when increasing last_idx
                 if not last:
