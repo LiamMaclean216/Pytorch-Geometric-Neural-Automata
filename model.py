@@ -20,7 +20,7 @@ cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
 class SelfAttnAggregation(Aggregation):
     def __init__(self, in_channels, n_heads = 1):
         super().__init__()
-        self.node_degree = 9
+        self.node_degree = 13
         self.in_channels = in_channels + self.node_degree
         self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
         self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
@@ -192,29 +192,45 @@ class UpdateRule(torch.nn.Module):
         return self.initial
         
     
-    def build_graph(self, height, width, mode="dense", input_mode="dense"):
+    def build_graph(self, height, width, mode="dense", input_mode="dense", n_edge_switches=0):
         self.initial_state(height, width, build=True)
         self.width = width
         self.height = height
         self.n_non_io_nodes = width * height
         self.n_nodes = height*width + self.n_inputs + self.n_outputs
         
-        edges = build_edges(self.n_inputs, self.n_outputs, height, width, mode=mode, input_mode=input_mode)
-        
+        edges = build_edges(
+            self.n_inputs, self.n_outputs, height, width, mode=mode, input_mode=input_mode, n_switches=n_edge_switches
+        )
+        print(self.n_inputs, self.n_outputs, height, width, mode, input_mode, n_edge_switches)
         
         self.graph = Data(edge_index=edges, x=torch.zeros(self.n_nodes, self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone().to(self.cuda_device)
-        
+        print(self.edge_index.shape)
         self.edge_attr = None
         if self.edge_dim is not None:
             self.edge_attr = nn.parameter.Parameter(
                 torch.zeros([self.graph.edge_index[0].shape[0], self.edge_dim])
             ).to(self.cuda_device)
 
-        # self.edge_weight = nn.parameter.Parameter(
-        #     torch.ones([self.graph.edge_index[0].shape[0], 1]) / 100
-        # ).to(self.cuda_device)
-
+    def get_batch_edge_index(self, batch_size = 1, n_edge_switches=0):
+        edge_batch = []
+        for b in range(batch_size):
+            edge_batch.append(build_edges(
+                self.n_inputs, self.n_outputs, self.height, self.width, mode="dense", input_mode="grid", n_switches=n_edge_switches
+            ) + b*self.n_nodes)
+        
+        edge_batch = torch.concat(edge_batch, dim=1)
+        edge_batch = utils.sort_edge_index(edge_batch).to(self.cuda_device)
+        tmp = edge_batch[0].clone()
+        edge_batch[0] = edge_batch[1]
+        edge_batch[1] = tmp
+    
+        return edge_batch
+        # return Data(edge_index=edge_batch, x=torch.zeros(self.n_nodes, self.total_hidden_dim)).edge_index
+        
+            
+            
         
     def get_edge_weight(self):
         # return (self.edge_weight * 100).sigmoid()

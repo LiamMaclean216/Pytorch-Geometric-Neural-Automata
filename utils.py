@@ -54,7 +54,7 @@ def add_reverse_edges(edges):
     return torch.stack((torch.concat((edges[0], edges[1]), 0), torch.concat((edges[1], edges[0]), 0)), 0).transpose(0,1)
 
 
-def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="dense", input_mode="dense"):
+def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="dense", input_mode="dense", n_switches=0):
     """
     Builds edges like 2d_grid_graph
     """
@@ -94,6 +94,12 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
         output_edges = torch.tensor([[[(height*width)-(x+1), (height*width) + x+n_inputs] for x in range(width)]]).view(-1, 2)
     else:
         raise ValueError("input_mode must be either 'grid' or 'dense'")
+
+    #replace ten random elements of edges with [random, random]
+    for i in range(n_switches):
+        edges[random.randint(0, edges.shape[0]-1)] = torch.tensor([
+            random.randint(0, width*height), random.randint(0, width*height)
+        ])
 
     input_edges = add_reverse_edges(input_edges)
     output_edges = add_reverse_edges(output_edges)

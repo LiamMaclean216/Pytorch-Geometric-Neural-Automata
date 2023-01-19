@@ -45,11 +45,11 @@ def train_on_meta_set(
     loader = DataLoader([update_rule.graph]*training_params["batch_size"], batch_size = training_params["batch_size"])
     graph = loader.__iter__().__next__()
     graph.batch = graph.batch.to(device)
-    edge_index = utils.sort_edge_index(graph.edge_index).to(device)
-    tmp = edge_index[0].clone()
-    edge_index[0] = edge_index[1]
-    edge_index[1] = tmp
-    
+    # edge_index = utils.sort_edge_index(graph.edge_index).to(device)
+    # tmp = edge_index[0].clone()
+    # edge_index[0] = edge_index[1]
+    # edge_index[1] = tmp
+    edge_index = update_rule.get_batch_edge_index(batch_size=training_params["batch_size"], n_edge_switches=training_params['n_edge_switches'])
     
     if testing_set:
         edge_index_test = utils.sort_edge_index(update_rule.edge_index).to(device)

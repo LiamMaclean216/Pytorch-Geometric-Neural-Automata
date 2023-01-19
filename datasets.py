@@ -168,3 +168,44 @@ class MetaDataset():
     
     def get_set_size(self):
         return len(self.datasets[0])
+    
+class D():
+    def __init__(self, datasets, shuffle = True):
+        self.datasets = datasets
+        self.shuffle = shuffle
+        
+        self.batch_size = 1
+    
+    def __iter__(self):
+        if self.shuffle:
+            new_idx = torch.randperm(len(self.datasets))
+            self.datasets = [self.datasets[i].shuffle() for i in new_idx]
+        
+        datasets_in_batch = [self.datasets[i % len(self.datasets)] for i in range(self.batch_size)]
+        
+        if self.shuffle:
+            datasets_in_batch = [d.shuffle() for d in datasets_in_batch]
+        
+        
+        for x in zip(*([d.data for d in datasets_in_batch] + [d.target for d in datasets_in_batch])):
+            yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):])
+            
+    def __len__(self):
+        return len(self.datasets)
+    
+    # def iterate(self):
+    #     """
+    #     returns a generator that gives an shuffled index
+    #     """
+    #     self.init()
+    #     if self.shuffle:
+    #         return iter(torch.randperm(len(self.datasets)))
+
+    #     return iter(range(len(self.datasets)))
+    @property
+    def n_inputs(self):
+        return self.datasets[0].data.shape[1]
+
+    @property
+    def n_outputs(self):
+        return self.datasets[0].target.shape[1]
