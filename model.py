@@ -360,8 +360,8 @@ class UpdateRule(torch.nn.Module):
         updatet = self.relu(updatet)
         updatet = self.conv2(updatet, edge_index)#, edge_attr=edge_attr)
         
-        updatet = self.layer_norm2(updatet, batch=batch)
-        updatet = self.relu(updatet)
+        # updatet = self.layer_norm2(updatet, batch=batch)
+        # updatet = self.relu(updatet)
         # updatet = self.conv3(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
         # updatet = self.layer_norm3(updatet)
         # updatet = self.conv4(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
