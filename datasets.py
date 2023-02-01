@@ -211,7 +211,7 @@ class D():
     def n_outputs(self):
         return self.datasets[0].target.shape[1]
     
-def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/"):
+def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", print_filenames = False):
     max_dim = 3
     dataset = []
 
@@ -234,7 +234,8 @@ def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/"):
         except:
             continue
         
-        
+        if print_filenames:
+            print(filename)
         dataset.append(json_data)
     
     return dataset

@@ -118,11 +118,6 @@ class UpdateRule(torch.nn.Module):
         self.reverse_output_vectorizer = nn.Linear(input_dimension+1, self.input_vector_size)
         self.output_vectorizer = nn.Linear(10, input_dimension)
         
-        # self.layer_norm1 = LayerNorm(network_width*heads)
-        # self.layer_norm2 = LayerNorm(network_width*heads)
-        # self.layer_norm3 = LayerNorm(network_width*heads)
-        # self.layer_norm4 = LayerNorm(network_width*heads)
-        # self.layer_norm5 = LayerNorm(network_width*heads)
 
         self.layer_norm1 = PairNorm()#network_width*heads)
         self.layer_norm2 = PairNorm()#(network_width*heads)
@@ -130,20 +125,6 @@ class UpdateRule(torch.nn.Module):
         self.layer_norm4 = PairNorm()#(network_width*heads)
         self.layer_norm5 = PairNorm()#(network_width*heads)
 
-        # aggr = LSTMAggregation(network_width,network_width)#'lstm'
-        # self.conv1 = SAGEConv(
-        #     self.total_hidden_dim+2, network_width, aggr=LSTMAggregation(self.total_hidden_dim+2,self.total_hidden_dim+2), normalize=True
-        #     ,root_weight=True, project=False
-        # )
-        # self.conv2 = SAGEConv(network_width, network_width, aggr=LSTMAggregation(network_width,network_width), normalize=True)
-        # self.conv3 = SAGEConv(network_width, network_width, aggr=LSTMAggregation(network_width,network_width), normalize=True)
-        # self.conv4 = SAGEConv(network_width, network_width, aggr=LSTMAggregation(network_width,network_width), normalize=True)
-        # self.conv_out = SAGEConv(
-        #     network_width, hidden_dim, aggr=LSTMAggregation(network_width,network_width), normalize=True, root_weight=True, project=False
-        #     )
-
-
-        # aggr = SelfAttnAggregation(network_width)#'max'
         
         kwargs = {'add_self_loops': True, 'normalize':False}
         self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
@@ -152,11 +133,6 @@ class UpdateRule(torch.nn.Module):
         self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
 
-        self.forgor1 = nn.Linear(network_width+2, network_width)
-        self.forgor2 = nn.Linear(network_width, hidden_dim+2)
-        
-        self.update1 = nn.Linear(network_width+2, network_width)
-        self.update2 = nn.Linear(network_width, hidden_dim)
         
         self.reset()
 
@@ -297,7 +273,9 @@ class UpdateRule(torch.nn.Module):
         network_out = []
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
-            last = idx == last_idx#len(data) - 1
+            # last = idx == last_idx#len(data) - 1
+            last = idx == len(data) - 1
+            
             # print(problem_data_x, problem_data_y)
             # problem_data_y = torch.concat((problem_data_y,problem_data_y), 0)
             problem_data_y_ = problem_data_y.float()#.unsqueeze(-1) 
