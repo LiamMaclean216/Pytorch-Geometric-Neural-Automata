@@ -273,8 +273,8 @@ class UpdateRule(torch.nn.Module):
         network_out = []
         
         for idx, (problem_data_x, problem_data_y) in enumerate(data):
-            # last = idx == last_idx#len(data) - 1
-            last = idx == len(data) - 1
+            last = idx == last_idx
+            # last = idx == len(data) - 1
             
             # print(problem_data_x, problem_data_y)
             # problem_data_y = torch.concat((problem_data_y,problem_data_y), 0)
@@ -302,8 +302,8 @@ class UpdateRule(torch.nn.Module):
                     x = torch.cat((torch.zeros([x.shape[0], 1]).to(self.cuda_device), x), dim = 1)
                 x = self.step(x, edge_attr=edge_attr, edge_index=edge_index, batch=batch)
             
-            # if last:
-            #     break
+            if last:
+                break
 
         network_output = self.get_output(x)
         # loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
