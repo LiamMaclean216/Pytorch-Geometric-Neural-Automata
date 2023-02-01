@@ -66,7 +66,9 @@ def train_on_meta_set(
             edge_attr=edge_attr, edge_index=edge_index, batch=graph.batch, **forward_kwargs
         )
         # accuracy = (network_output.argmax(1) == correct.argmax(1)).sum().item() / training_params["batch_size"]
-        accuracy = ((network_output.round() == correct).sum().item() / training_params["batch_size"]) / network_output.shape[1]
+        correct =  correct.argmax(-1)
+        network_output = network_output.argmax(-1)
+        accuracy = ((network_output == correct).sum().item() / training_params["batch_size"]) / network_output.shape[1]
         
         
         loss.backward()

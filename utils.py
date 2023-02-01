@@ -111,6 +111,33 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     return edges
 
 
+def build_edges_3d(input_shape: tuple, height: int):
+    G = nx.grid_graph(dim=(input_shape[0], input_shape[1], height))
+    
+    edge_list = list(G.edges())
+    node_list = list(G.nodes())
+
+    #replace each element of edge_list with its index in node_list
+    for i in range(len(edge_list)):
+        edge_list[i] = (node_list.index(edge_list[i][0]), node_list.index(edge_list[i][1]))
+        
+    edges = torch.tensor(edge_list)
+    edges = add_reverse_edges(edges)
+    
+    input_edges = torch.tensor([[x, x+len(node_list)] for x in range(0,input_shape[0] * input_shape[1])])
+    output_edges = torch.tensor(
+        [[len(node_list) - x, x+len(node_list)+input_edges.shape[0]] for x in range(1,(input_shape[0] * input_shape[1]) + 1)]
+        )
+    
+    input_edges = add_reverse_edges(input_edges)
+    output_edges = add_reverse_edges(output_edges)
+
+    edges = torch.cat((edges, input_edges,output_edges)).transpose(0,1)
+    
+    edges = remove_self_loops(edges)[0]
+    edges = add_self_loops(edges)[0]
+    return edges
+
 
 def run_rule(data_x, update_rule, n_steps = 5):
     x = update_rule.initial

@@ -2,7 +2,8 @@ import torch
 from torch.nn.functional import one_hot
 from torch.utils.data import DataLoader
 import random
-
+import os
+import json
 class SelfOrganizeTest(torch.nn.Module):
     """
     If Rule can learn this data, then it can somewhat self organize
@@ -209,3 +210,31 @@ class D():
     @property
     def n_outputs(self):
         return self.datasets[0].target.shape[1]
+    
+def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/"):
+    max_dim = 3
+    dataset = []
+
+    for filename in os.listdir(path):
+        json_data = json.loads(open(path + filename).read())
+        
+        if len(json_data['train'][0]['input']) > max_dim or len(json_data['train'][0]['input'][0]) > max_dim:
+            continue
+        
+        if len(json_data['train'][0]['output']) > max_dim or len(json_data['train'][0]['output'][0]) > max_dim:
+            continue
+        
+        try:
+            if torch.tensor([x['input'] for x in json_data['train']]).shape[1] != max_dim:
+                continue
+            
+            if torch.tensor([x['output'] for x in json_data['train']]).shape[1] != max_dim:
+                continue
+            
+        except:
+            continue
+        
+        
+        dataset.append(json_data)
+    
+    return dataset
