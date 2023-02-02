@@ -88,6 +88,7 @@ class UpdateRule(torch.nn.Module):
                 edge_dim,
                 network_width = 80,
                 heads = 1,
+                input_vector_size = 10,
                 cuda_device = torch.device("cpu")
                 ):
         
@@ -100,6 +101,7 @@ class UpdateRule(torch.nn.Module):
         skip_size = hidden_dim
         self.total_hidden_dim = hidden_dim# + skip_size
         self.network_width = network_width
+        self.input_vector_size = input_vector_size
         
         fill_value = 'mean'
         if edge_dim is not None:
@@ -111,26 +113,25 @@ class UpdateRule(torch.nn.Module):
         
         # self.input_vectorizer = nn.Linear(n_inputs, self.total_hidden_dim, bias=True)
         input_dimension = 10
-        self.input_vector_size = 10
         self.input_vectorizer = nn.Linear(input_dimension, self.input_vector_size)
         
         # Vectorizes training targets
         self.reverse_output_vectorizer = nn.Linear(input_dimension+1, self.input_vector_size)
-        self.output_vectorizer = nn.Linear(10, input_dimension)
+        self.output_vectorizer = nn.Linear(self.input_vector_size, input_dimension)
         
 
         self.layer_norm1 = PairNorm()#network_width*heads)
         self.layer_norm2 = PairNorm()#(network_width*heads)
-        self.layer_norm3 = PairNorm()#(network_width*heads)
-        self.layer_norm4 = PairNorm()#(network_width*heads)
-        self.layer_norm5 = PairNorm()#(network_width*heads)
+        # self.layer_norm3 = PairNorm()#(network_width*heads)
+        # self.layer_norm4 = PairNorm()#(network_width*heads)
+        # self.layer_norm5 = PairNorm()#(network_width*heads)
 
         
         kwargs = {'add_self_loops': True, 'normalize':False}
         self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
-        self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
-        self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
-        self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
 
         
@@ -324,7 +325,7 @@ class UpdateRule(torch.nn.Module):
         updatet = self.conv1(x, edge_index)#, edge_attr=edge_attr)
         updatet = self.layer_norm1(updatet, batch=batch)
         updatet = self.relu(updatet)
-        updatet = self.conv2(updatet, edge_index)#, edge_attr=edge_attr)
+        updatet = self.conv_out(updatet, edge_index)#, edge_attr=edge_attr)
         updatet = self.layer_norm2(updatet, batch=batch)
         updatet = self.relu(updatet)
         x = x[:, :-2] + updatet# * update
@@ -352,7 +353,7 @@ class UpdateRule(torch.nn.Module):
             outputs.append(
                 self.output_vectorizer
                 (
-                x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :10]
+                x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :self.input_vector_size]
             ).squeeze(-1))
             
         output = torch.stack(outputs)
