@@ -22,8 +22,8 @@ class SelfAttnAggregation(Aggregation):
         super().__init__()
         self.node_degree = 9
         self.in_channels = in_channels + self.node_degree
-        self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
-        self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
+        self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
+        self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
         # self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
         # self.attention4 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
         self.n_heads = n_heads
