@@ -46,12 +46,13 @@ class Dataset(torch.utils.data.Dataset):
     """
     datset superclass
     """
-    def __init__(self, data, target):
+    def __init__(self, data, target, metadata=None):
         cuda_device = torch.device("cuda:0" if torch.cuda.is_available else "cpu")
         # cuda_device = torch.device("cpu")
         
         self.data = torch.tensor(data).to(cuda_device)
         self.target = torch.tensor(target).to(cuda_device)
+        self.metadata = metadata
         
     def __getitem__(self, index):
         return self.data[index], self.target[index]
@@ -68,7 +69,7 @@ class Dataset(torch.utils.data.Dataset):
         self.target = self.target[new_idx]
         
         #return a copy of self
-        return Dataset(self.data, self.target)        
+        return Dataset(self.data, self.target, self.metadata)        
 
 
 class TranslateDataset(Dataset):
@@ -187,9 +188,12 @@ class D():
         if self.shuffle:
             datasets_in_batch = [d.shuffle() for d in datasets_in_batch]
         
-        
+        #this is borked
+        # for x, metadata in zip(zip(*([d.data for d in datasets_in_batch] + [d.target for d in datasets_in_batch])), [d.metadata for d in datasets_in_batch]):
+        #     yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):]), metadata
+            
         for x in zip(*([d.data for d in datasets_in_batch] + [d.target for d in datasets_in_batch])):
-            yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):])
+            yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):]), None
             
     def __len__(self):
         return len(self.datasets)
@@ -231,11 +235,15 @@ def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", pr
             if torch.tensor([x['output'] for x in json_data['train']]).shape[1] != max_dim:
                 continue
             
+            if len(json_data['train']) + len(json_data['test']) < 4:
+                continue
         except:
             continue
         
         if print_filenames:
             print(filename)
+            
+        json_data['filename'] = filename
         dataset.append(json_data)
     
     return dataset

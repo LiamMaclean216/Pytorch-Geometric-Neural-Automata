@@ -126,8 +126,9 @@ def build_edges_3d(input_shape: tuple, height: int):
     
     input_edges = torch.tensor([[x, x+len(node_list)] for x in range(0,input_shape[0] * input_shape[1])])
     output_edges = torch.tensor(
-        [[len(node_list) - x, x+len(node_list)+input_edges.shape[0]] for x in range(1,(input_shape[0] * input_shape[1]) + 1)]
+        [[len(node_list) - x, x+len(node_list)+input_edges.shape[0] - 1] for x in range(1,(input_shape[0] * input_shape[1]) + 1)]
         )
+    
     
     input_edges = add_reverse_edges(input_edges)
     output_edges = add_reverse_edges(output_edges)

@@ -180,16 +180,10 @@ class UpdateRule(torch.nn.Module):
         edges = build_edges(
             self.n_inputs, self.n_outputs, height, width, mode=mode, input_mode=input_mode, n_switches=n_edge_switches
         )
-        print(self.n_inputs, self.n_outputs, height, width, mode, input_mode, n_edge_switches)
         
         self.graph = Data(edge_index=edges, x=torch.zeros(self.n_nodes, self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone().to(self.cuda_device)
-        print(self.edge_index.shape)
         self.edge_attr = None
-        if self.edge_dim is not None:
-            self.edge_attr = nn.parameter.Parameter(
-                torch.zeros([self.graph.edge_index[0].shape[0], self.edge_dim])
-            ).to(self.cuda_device)
 
     def build_graph_3d(self, shape, height):
         self.mode  = "3d"
@@ -203,7 +197,7 @@ class UpdateRule(torch.nn.Module):
         
         
         edge_index = build_edges_3d(shape, height)
-        self.graph = Data(edge_index=edge_index, x=torch.zeros(18,3))
+        self.graph = Data(edge_index=edge_index, x=torch.zeros(self.n_nodes,self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone().to(self.cuda_device)
         
     def get_batch_edge_index(self, batch_size = 1, n_edge_switches=0):
@@ -240,7 +234,6 @@ class UpdateRule(torch.nn.Module):
     def vectorise_input(self, x, input_data):
         
         vectorized_input = self.input_vectorizer(input_data)
-        
         mask = torch.zeros_like(x).to(self.cuda_device)
         for i in range(mask.shape[0]//self.n_nodes):
             mask[
@@ -272,10 +265,9 @@ class UpdateRule(torch.nn.Module):
         network_in = []
         network_out = []
         
-        for idx, (problem_data_x, problem_data_y) in enumerate(data):
+        for idx, (problem_data_x, problem_data_y, metadata) in enumerate(data):
             last = idx == last_idx
             # last = idx == len(data) - 1
-            
             # print(problem_data_x, problem_data_y)
             # problem_data_y = torch.concat((problem_data_y,problem_data_y), 0)
             problem_data_y_ = problem_data_y.float()#.unsqueeze(-1) 
@@ -284,7 +276,9 @@ class UpdateRule(torch.nn.Module):
             # print(input_data, problem_data_y_)
             
             # input_data = torch.concat((input_data,input_data), 0)
-            
+            if last:
+                problem_data_y_ = torch.zeros_like(problem_data_y_)
+                
             if not last:
                 x = self.vectorize_output(x, problem_data_y_)
             else:
@@ -306,6 +300,7 @@ class UpdateRule(torch.nn.Module):
                 break
 
         network_output = self.get_output(x)
+        
         # loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
         
         #l2 loss
@@ -318,53 +313,20 @@ class UpdateRule(torch.nn.Module):
                 loss, 
                 network_output.cpu().detach().numpy(),
                 problem_data_y.cpu().float().numpy(), 
-                np.array(network_out)
+                np.array(network_out),
+                metadata
             )
         
         return x
         
-    
-    def act(self, x, env_state, n_step = 1):
-        input_data = env_state.float().unsqueeze(-1).to(self.cuda_device)
-        x = self.vectorise_input(x, input_data)
-        for _ in range(n_step):
-            x = self.step(x, env_state.float(), None)
-        
-        return x
-        
-    
     def step(self, x, edge_attr = None, edge_index = None, batch=None):
-        # if edge_index is None:
-        #     edge_index = self.edge_index
         
-        # for i in x:
-        #     print(i)
-        # print("#######")
-        # forgor = self.forgor1(x).sigmoid()
-        # forgor = self.forgor2(forgor).sigmoid()
-        # x = (x * forgor)# + (
-            # (1 - forgor) * torch.cat(
-            #     (self.initial_state().repeat(x.shape[0] // self.initial_state().shape[0], 1), torch.zeros([x.shape[0], 2]).to(self.cuda_device))
-            #     , dim = -1))
-
-        # update = self.update1(x).sigmoid()
-        # update = self.update2(update).sigmoid() 
-        
-
-        edge_weight = None#self.get_edge_weight()#None
         updatet = self.conv1(x, edge_index)#, edge_attr=edge_attr)
         updatet = self.layer_norm1(updatet, batch=batch)
         updatet = self.relu(updatet)
         updatet = self.conv2(updatet, edge_index)#, edge_attr=edge_attr)
         updatet = self.layer_norm2(updatet, batch=batch)
         updatet = self.relu(updatet)
-        # updatet = self.conv3(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
-        # updatet = self.layer_norm3(updatet)
-        # updatet = self.conv4(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr)
-        # updatet = self.layer_norm4(updatet)
-
-        # updatet = self.conv_out(updatet, edge_index, edge_weight=edge_weight)#, edge_attr=edge_attr).tanh()
-        # x = x + updatet #* update
         x = x[:, :-2] + updatet# * update
 
         # temporal nonlinearity
@@ -374,7 +336,6 @@ class UpdateRule(torch.nn.Module):
         x = x / 2
         
         return x
-    
     
     def get_output(self, x, softmax=True):
         """
@@ -395,8 +356,6 @@ class UpdateRule(torch.nn.Module):
             ).squeeze(-1))
             
         output = torch.stack(outputs)
-        # print(x)
-        # print(output)
         
         if softmax:
             output = output.softmax(-1)

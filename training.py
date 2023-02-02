@@ -52,16 +52,14 @@ def train_on_meta_set(
     edge_index = update_rule.get_batch_edge_index(batch_size=training_params["batch_size"], n_edge_switches=training_params['n_edge_switches'])
     
     if testing_set:
-        edge_index_test = utils.sort_edge_index(update_rule.edge_index).to(device)
-        tmp = edge_index_test[0].clone()
-        edge_index_test[0] = edge_index_test[1]
-        edge_index_test[1] = tmp
+        edge_index_test = update_rule.get_batch_edge_index(batch_size=testing_set.batch_size, n_edge_switches=0)
+        
     
         
     for epoch in range(training_params["n_epochs"]):
         update_rule.reset()
         x = update_rule.initial_state().repeat(training_params["batch_size"], 1)
-        x, loss, network_output, correct, network_in = update_rule.train()(
+        x, loss, network_output, correct, network_in, metadata = update_rule.train()(
             x, training_params["n_steps"], training_set, 
             edge_attr=edge_attr, edge_index=edge_index, batch=graph.batch, **forward_kwargs
         )
@@ -86,11 +84,15 @@ def train_on_meta_set(
         log = {"training loss": loss, "training acc": accuracy}
         
         if testing_set:
+            
             x = update_rule.initial_state().repeat(testing_set.batch_size, 1)
-            _, test_loss, network_output_, correct_, _ = update_rule.eval()(
-                x, training_params["n_steps"], testing_set, 
+            _, test_loss, network_output_, correct_, _, _ = update_rule.eval()(
+                x, training_params["n_steps"], testing_set, batch=update_rule.graph.batch,
                 edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
             )
+            network_output_ =  network_output_.argmax(-1)
+            correct_ = correct_.argmax(-1)
+            
             # test_accuracy = (network_output_.argmax(1) == correct_.argmax(1)).sum().item() / network_output.shape[1]
             test_accuracy = ((network_output_.round() == correct_).sum().item() / testing_set.batch_size) / network_output_.shape[1]
 
@@ -109,7 +111,8 @@ def train_on_meta_set(
             Loss {loss:.6} |
             Accuracy {int(accuracy * 100)}% |
             Network out: {network_output[0]} |
-            Correct:  {correct[0]}
+            Correct:  {correct[0]} |
+            {metadata}
             """.replace("\n", " ").replace("            ", "")
         
         # Test Loss {test_loss:.6} |
