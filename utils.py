@@ -164,7 +164,7 @@ def seed(seed):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-
+# https://towardsdatascience.com/how-to-code-the-transformer-in-pytorch-24db27c8f9ec#d554
 class PositionalEncoder(torch.nn.Module):
     def __init__(self, d_model, max_seq_len = 80):
         super().__init__()

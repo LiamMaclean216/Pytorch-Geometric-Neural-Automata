@@ -40,7 +40,7 @@ class SelfAttnAggregation(Aggregation):
                 dim: int = -2) -> Tensor:
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-        x = self.pos(x)
+        x_pos = self.pos(x)
         #adding directionality increases stability with more nodes
         # x = torch.concat((
         #     x,
@@ -53,8 +53,8 @@ class SelfAttnAggregation(Aggregation):
         #self attention on x
         #repeat x for each head
         x = x + (
-            self.attention1(x,x,x)[0] + 
-            self.attention2(x, x, x)[0])# +
+            self.attention1(x_pos,x_pos,x_pos)[0] + 
+            self.attention2(x_pos,x_pos,x_pos)[0])# +
             # self.attention3(x, x, x)[0] +
             # self.attention4(x, x, x)[0]
         # ) 
