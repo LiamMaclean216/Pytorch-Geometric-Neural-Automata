@@ -25,6 +25,7 @@ def train_on_meta_set(
     wandb_loss='loss',
     wandb_acc='acc',
     save_dir=None,
+    starting_epoch=0,
     device=torch.device("cpu"),
     **forward_kwargs,
     ):
@@ -56,7 +57,7 @@ def train_on_meta_set(
         
     
         
-    for epoch in range(training_params["n_epochs"]):
+    for epoch in range(starting_epoch, training_params["n_epochs"]):
         update_rule.reset()
         x = update_rule.initial_state().repeat(training_params["batch_size"], 1)
         x, loss, network_output, correct, network_in, metadata = update_rule.train()(

@@ -21,7 +21,10 @@ class SelfAttnAggregation(Aggregation):
     def __init__(self, in_channels, n_heads = 1):
         super().__init__()
         self.node_degree = 9
-        self.in_channels = in_channels + self.node_degree
+        self.in_channels = in_channels# + self.node_degree
+        
+        self.pos = PositionalEncoder(self.in_channels)
+        
         self.attention1 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
         self.attention2 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0)
         # self.attention3 = MultiheadAttention(self.in_channels, n_heads, batch_first=True, dropout=0.15)
@@ -37,21 +40,18 @@ class SelfAttnAggregation(Aggregation):
                 dim: int = -2) -> Tensor:
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
+        x = self.pos(x)
         #adding directionality increases stability with more nodes
-        x = torch.concat((
-            x,
-            one_hot(torch.arange(x.shape[1]), x.shape[1]).unsqueeze(0).repeat(x.shape[0],1,1).to(cuda_device)
-        ), -1)
+        # x = torch.concat((
+        #     x,
+        #     one_hot(torch.arange(x.shape[1]), x.shape[1]).unsqueeze(0).repeat(x.shape[0],1,1).to(cuda_device)
+        # ), -1)
 
-        x = torch.nn.functional.pad(x, (0, self.in_channels - x.shape[2]), "constant", 0)
+        # x = torch.nn.functional.pad(x, (0, self.in_channels - x.shape[2]), "constant", 0)
         
-        # fogor = self.attention_fogor(x, x, x)[0]
-        # update = self.attention_update(x, x, x)[0]
 
         #self attention on x
         #repeat x for each head
-        # print(x_repeated.shape)
-        # print(self.attention1(x_repeated,x_repeated,x_repeated)[0])
         x = x + (
             self.attention1(x,x,x)[0] + 
             self.attention2(x, x, x)[0])# +
@@ -62,12 +62,8 @@ class SelfAttnAggregation(Aggregation):
         
 
         #remove the directionality
-        x = x[:, :, :self.in_channels - self.node_degree]
-        # fogor = fogor[:, :, :self.in_channels - self.node_degree]
+        # x = x[:, :, :self.in_channels - self.node_degree]
         return torch.max(x, dim=1)[0]# * torch.sum(fogor, dim=1).sigmoid()
-        # sum sucks    
-        # return torch.sum(x, dim=1)
-        # return self.reduce(x, index, ptr, dim_size, dim, reduce='max')
 
 from torch.nn import ReLU, LeakyReLU
 import torch
@@ -197,20 +193,26 @@ class UpdateRule(torch.nn.Module):
         self.height = height
         
         
-        edge_index = build_edges_3d(shape, height)
+        edge_index = build_edges_3d((3,3), height)
         self.graph = Data(edge_index=edge_index, x=torch.zeros(self.n_nodes,self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone().to(self.cuda_device)
         
-    def get_batch_edge_index(self, batch_size = 1, n_edge_switches=0):
+    def get_batch_edge_index(self, batch_size = 1, n_edge_switches=0, shape=None, height = None):
+        if shape is None:
+            shape = self.shape
+        
+        if height is None:
+            height = self.height
+            
         edge_batch = []
         for b in range(batch_size):
             if self.mode == "2d":
                 edge_batch.append(build_edges(
-                    self.n_inputs, self.n_outputs, self.height, self.width, mode="dense", input_mode="grid", n_switches=n_edge_switches
+                    self.n_inputs, self.n_outputs, height, self.width, mode="dense", input_mode="grid", n_switches=n_edge_switches
                 ) + b*self.n_nodes)
             elif self.mode == "3d":
                 edge_batch.append(build_edges_3d(
-                    self.shape, self.height
+                    shape, height
                 ) + b*self.n_nodes)
         
         edge_batch = torch.concat(edge_batch, dim=1)
@@ -228,7 +230,7 @@ class UpdateRule(torch.nn.Module):
         return None
 
     def draw(self):
-        graph = utils.to_networkx(self.graph, to_undirected=True, remove_self_loops = True)
+        graph = utils.to_networkx(self.graph, to_undirected=False, remove_self_loops = False)
         nx.draw(graph)
     
     
