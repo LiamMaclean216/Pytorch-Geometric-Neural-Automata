@@ -126,13 +126,13 @@ class UpdateRule(torch.nn.Module):
 
         
         kwargs = {'add_self_loops': True, 'normalize':False}
-        # self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
+        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
-        # self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
-        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr='max', **kwargs)
-        self.conv_out = GCNConv(network_width, hidden_dim, aggr='max', **kwargs)
+        self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
+        # self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr='max', **kwargs)
+        # self.conv_out = GCNConv(network_width, hidden_dim, aggr='max', **kwargs)
 
         
         self.reset()

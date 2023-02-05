@@ -1,3 +1,4 @@
+from functools import lru_cache
 import torch
 import networkx as nx
 from torch_geometric.utils import grid, remove_self_loops, add_self_loops
@@ -111,7 +112,7 @@ def build_edges(n_inputs: int, n_outputs: int, height: int, width: int, mode="de
     edges = add_self_loops(edges)[0]
     return edges
 
-
+@lru_cache(maxsize=30)
 def build_edges_3d(input_shape: tuple, height: int):
     G = nx.grid_graph(dim=(input_shape[0], input_shape[1], height))
     

@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 import random
 import os
 import json
+import torch.nn.functional as F
+
 class SelfOrganizeTest(torch.nn.Module):
     """
     If Rule can learn this data, then it can somewhat self organize
@@ -247,3 +249,10 @@ def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", pr
         dataset.append(json_data)
     
     return dataset
+
+def process_arc_sample(sample, io, final_dim=3, pad = False, d_len = 4):
+    sample = torch.tensor([x[io] for x in sample['train'] + sample['test']])
+    if pad:
+        sample = F.pad(sample, (0, final_dim - sample.shape[2], 0, final_dim - sample.shape[1]))
+    sample = one_hot(sample.flatten(1,2), 10)[:d_len]
+    return sample
