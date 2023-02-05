@@ -347,6 +347,7 @@ class UpdateRule(torch.nn.Module):
         # updatet = self.relu(updatet)
         x = x[:, :-2] + updatet# * update
 
+        x = x.tanh()
         # temporal nonlinearity
         # x[:, -1][x[:, -1] > 1] = 0
         # x[:, -1][x[:, -1] < -1] = 0
