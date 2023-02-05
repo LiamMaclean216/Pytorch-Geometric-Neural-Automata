@@ -40,7 +40,7 @@ class SelfAttnAggregation(Aggregation):
                 dim: int = -2) -> Tensor:
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-        x_pos = self.pos(x)
+        x_pos = x#self.pos(x)
         #adding directionality increases stability with more nodes
         # x = torch.concat((
         #     x,
