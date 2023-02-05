@@ -40,7 +40,7 @@ class SelfAttnAggregation(Aggregation):
                 dim: int = -2) -> Tensor:
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-        x_pos = x#self.pos(x)
+        x_pos = self.pos(x)
         #adding directionality increases stability with more nodes
         # x = torch.concat((
         #     x,
@@ -89,6 +89,7 @@ class UpdateRule(torch.nn.Module):
                 ):
         
         super(UpdateRule, self).__init__()
+        
         self.cuda_device = cuda_device
         self.edge_dim = edge_dim
         self.n_inputs = n_inputs
@@ -115,7 +116,8 @@ class UpdateRule(torch.nn.Module):
         self.reverse_output_vectorizer = nn.Linear(input_dimension+1, self.input_vector_size)
         self.output_vectorizer = nn.Linear(self.input_vector_size, input_dimension)
         
-
+        # self.layer_norm1 = LayerNorm(network_width*heads)
+        # self.layer_norm2 = LayerNorm(network_width*heads)
         self.layer_norm1 = PairNorm()#network_width*heads)
         self.layer_norm2 = PairNorm()#(network_width*heads)
         # self.layer_norm3 = PairNorm()#(network_width*heads)
@@ -124,11 +126,13 @@ class UpdateRule(torch.nn.Module):
 
         
         kwargs = {'add_self_loops': True, 'normalize':False}
-        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
-        self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
+        # self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
+        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr='max', **kwargs)
+        self.conv_out = GCNConv(network_width, hidden_dim, aggr='max', **kwargs)
 
         
         self.reset()
@@ -144,6 +148,7 @@ class UpdateRule(torch.nn.Module):
         #initial state is all zeros
         if build:
             self.initial = torch.zeros([self.n_nodes, self.total_hidden_dim]).to(self.cuda_device)
+        self.labels = [str(x) for x in list(range(self.n_nodes))]
 
 
         #trained initial on only input and output nodes
@@ -230,18 +235,29 @@ class UpdateRule(torch.nn.Module):
         return None
 
     def draw(self):
-        graph = utils.to_networkx(self.graph, to_undirected=False, remove_self_loops = False)
-        nx.draw(graph)
-    
-    
+        graph = Data(edge_index=self.get_batch_edge_index(1))
+        graph = utils.to_networkx(graph, to_undirected=True, remove_self_loops = True)
+        # nx.draw(graph)
+        for i in range(self.n_non_io_nodes,self.n_non_io_nodes+self.n_outputs):
+            self.labels[i] += " input"
+        for i in range((self.n_non_io_nodes) + self.n_outputs , self.n_nodes ):
+            self.labels[i] += " output"
+        for i in range(self.n_non_io_nodes + self.n_inputs,self.n_nodes):
+            self.labels[i] += "o"
+            
+        labels = {x : self.labels[x] for x in range(self.n_nodes)}
+        nx.draw_networkx(graph, with_labels=True, labels = labels)
     def vectorise_input(self, x, input_data):
         
         vectorized_input = self.input_vectorizer(input_data)
         mask = torch.zeros_like(x).to(self.cuda_device)
+        
+        
         for i in range(mask.shape[0]//self.n_nodes):
             mask[
                     self.n_non_io_nodes+(i*self.n_nodes):self.n_non_io_nodes+self.n_outputs+(i*self.n_nodes), :self.input_vector_size
                 ] = vectorized_input[i]
+        
         
         # print(x.shape)
         # print(x)
@@ -252,13 +268,13 @@ class UpdateRule(torch.nn.Module):
             
     def vectorize_output(self, x, input_data):
         vectorized_output = self.reverse_output_vectorizer(input_data)
-        
         mask = torch.zeros_like(x).to(self.cuda_device)
         for i in range(mask.shape[0]//self.n_nodes):
             mask[
                     (self.n_non_io_nodes) + self.n_outputs + (i*self.n_nodes): self.n_nodes + (i*self.n_nodes), :self.input_vector_size
                 ] = vectorized_output[i]
             
+        
         x = x + mask
         return x
     
@@ -267,9 +283,9 @@ class UpdateRule(torch.nn.Module):
     ):
         network_in = []
         network_out = []
-        
         for idx, (problem_data_x, problem_data_y, metadata) in enumerate(data):
             last = idx == last_idx
+            
             # last = idx == len(data) - 1
             # print(problem_data_x, problem_data_y)
             # problem_data_y = torch.concat((problem_data_y,problem_data_y), 0)
@@ -323,12 +339,11 @@ class UpdateRule(torch.nn.Module):
         return x
         
     def step(self, x, edge_attr = None, edge_index = None, batch=None):
-        
         updatet = self.conv1(x, edge_index)#, edge_attr=edge_attr)
-        updatet = self.layer_norm1(updatet, batch=batch)
+        # updatet = self.layer_norm1(updatet, batch=batch)
         updatet = self.relu(updatet)
         updatet = self.conv_out(updatet, edge_index)#, edge_attr=edge_attr)
-        updatet = self.layer_norm2(updatet, batch=batch)
+        # updatet = self.layer_norm2(updatet, batch=batch)
         updatet = self.relu(updatet)
         x = x[:, :-2] + updatet# * update
 
@@ -357,7 +372,8 @@ class UpdateRule(torch.nn.Module):
                 (
                 x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :self.input_vector_size]
             ).squeeze(-1))
-            
+        
+        
         output = torch.stack(outputs)
         
         if softmax:
@@ -371,14 +387,5 @@ class UpdateRule(torch.nn.Module):
     def reset(self):
         self.vectorized_input = None
         self.vectorized_output = None
-        
-        # self.conv1.reset()
-        # self.conv2.reset()
-        # self.conv3.reset()
-        # self.conv4.reset()
-        # self.conv_out.reset()
-        
-        
-        # self.edge_weight = torch.zeros([162, 1])
         
 
