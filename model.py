@@ -40,7 +40,7 @@ class SelfAttnAggregation(Aggregation):
                 dim: int = -2) -> Tensor:
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-        x_pos = x#self.pos(x)
+        x_pos = self.pos(x)
         #adding directionality increases stability with more nodes
         # x = torch.concat((
         #     x,
@@ -344,7 +344,7 @@ class UpdateRule(torch.nn.Module):
         updatet = self.relu(updatet)
         updatet = self.conv_out(updatet, edge_index)#, edge_attr=edge_attr)
         # updatet = self.layer_norm2(updatet, batch=batch)
-        updatet = self.relu(updatet)
+        # updatet = self.relu(updatet)
         x = x[:, :-2] + updatet# * update
 
         # temporal nonlinearity
