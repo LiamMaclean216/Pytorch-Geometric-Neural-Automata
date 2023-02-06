@@ -192,3 +192,20 @@ class PositionalEncoder(torch.nn.Module):
         seq_len = x.size(1)
         x = x + self.pe[:,:seq_len]
         return x
+    
+def get_shape_input_indicies(shape: tuple, height: int):
+    n_non_io_nodes = shape[0] * shape[1] * height
+    
+    input_start_index = n_non_io_nodes
+    output_start_index = n_non_io_nodes + shape[0] * shape[1]
+    n_nodes = n_non_io_nodes + shape[0] * shape[1] * 2
+    
+    return input_start_index, output_start_index, n_nodes
+
+def get_shape_output_indices(shape: tuple, height: int):
+    n_non_io_nodes = shape[0] * shape[1] * height
+    
+    output_start_index = n_non_io_nodes + shape[0] * shape[1]
+    n_nodes = n_non_io_nodes + shape[0] * shape[1] * 2
+    
+    return output_start_index, n_nodes, n_nodes

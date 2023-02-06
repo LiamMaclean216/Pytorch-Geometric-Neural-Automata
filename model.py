@@ -7,7 +7,7 @@ from torch_geometric.nn.norm import LayerNorm, PairNorm, MeanSubtractionNorm
 from typing import Optional
 from torch import Tensor
 import torch
-
+from utils import get_shape_input_indicies
 from torch_geometric.nn.aggr import LSTMAggregation, MaxAggregation, AttentionalAggregation
 from torch.nn import LSTM, MultiheadAttention
 from torch.nn.functional import one_hot
@@ -40,7 +40,7 @@ class SelfAttnAggregation(Aggregation):
                 dim: int = -2) -> Tensor:
         x, _ = self.to_dense_batch(x, index, ptr, dim_size, dim)
 
-        x_pos = self.pos(x)
+        x_pos = x#self.pos(x)
         #adding directionality increases stability with more nodes
         # x = torch.concat((
         #     x,
@@ -126,13 +126,13 @@ class UpdateRule(torch.nn.Module):
 
         
         kwargs = {'add_self_loops': True, 'normalize':False}
-        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
+        # self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr= SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv2 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv3 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
         # self.conv4 = GCNConv(network_width, network_width, aggr=SelfAttnAggregation(network_width, heads), **kwargs)
-        self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
-        # self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr='max', **kwargs)
-        # self.conv_out = GCNConv(network_width, hidden_dim, aggr='max', **kwargs)
+        # self.conv_out = GCNConv(network_width, hidden_dim, aggr=SelfAttnAggregation(hidden_dim, heads), **kwargs)
+        self.conv1 = GCNConv(self.total_hidden_dim+2, network_width, aggr='max', **kwargs)
+        self.conv_out = GCNConv(network_width, hidden_dim, aggr='max', **kwargs)
 
         
         self.reset()
@@ -202,23 +202,29 @@ class UpdateRule(torch.nn.Module):
         self.graph = Data(edge_index=edge_index, x=torch.zeros(self.n_nodes,self.total_hidden_dim))
         self.edge_index = self.graph.edge_index.long().clone().to(self.cuda_device)
         
-    def get_batch_edge_index(self, batch_size = 1, n_edge_switches=0, shape=None, height = None):
-        if shape is None:
-            shape = self.shape
+    def get_batch_edge_index(self, shapes, batch_size = 1, n_edge_switches=0, height = None):
         
         if height is None:
             height = self.height
             
         edge_batch = []
-        for b in range(batch_size):
-            if self.mode == "2d":
-                edge_batch.append(build_edges(
-                    self.n_inputs, self.n_outputs, height, self.width, mode="dense", input_mode="grid", n_switches=n_edge_switches
-                ) + b*self.n_nodes)
-            elif self.mode == "3d":
-                edge_batch.append(build_edges_3d(
-                    shape, height
-                ) + b*self.n_nodes)
+        # for b in range(batch_size):
+        #     if self.mode == "2d":
+        #         edge_batch.append(build_edges(
+        #             self.n_inputs, self.n_outputs, height, self.width, mode="dense", input_mode="grid", n_switches=n_edge_switches
+        #         ) + b*self.n_nodes)
+        #     elif self.mode == "3d":
+        #         edge_batch.append(build_edges_3d(
+        #             shape, height
+        #         ) + b*self.n_nodes)
+        
+        initial = 0
+        i = 0
+        for shape in shapes:
+            edge_batch.append(build_edges_3d(
+                shape, height) + i)
+            i += edge_batch[-1].shape[0]
+            initial += shape[0]*shape[1]*height + 2*shape[0]*shape[1]
         
         edge_batch = torch.concat(edge_batch, dim=1)
         edge_batch = utils.sort_edge_index(edge_batch).to(self.cuda_device)
@@ -226,7 +232,7 @@ class UpdateRule(torch.nn.Module):
         edge_batch[0] = edge_batch[1]
         edge_batch[1] = tmp
     
-        return edge_batch
+        return edge_batch, torch.zeros(initial, self.total_hidden_dim).to(self.cuda_device)
         # return Data(edge_index=edge_batch, x=torch.zeros(self.n_nodes, self.total_hidden_dim)).edge_index
         
         
@@ -235,62 +241,86 @@ class UpdateRule(torch.nn.Module):
         return None
 
     def draw(self):
-        graph = Data(edge_index=self.get_batch_edge_index(1))
+        graph = Data(edge_index=self.get_batch_edge_index(1)[0])
         graph = utils.to_networkx(graph, to_undirected=True, remove_self_loops = True)
-        # nx.draw(graph)
-        for i in range(self.n_non_io_nodes,self.n_non_io_nodes+self.n_outputs):
-            self.labels[i] += " input"
-        for i in range((self.n_non_io_nodes) + self.n_outputs , self.n_nodes ):
-            self.labels[i] += " output"
-        for i in range(self.n_non_io_nodes + self.n_inputs,self.n_nodes):
-            self.labels[i] += "o"
+        start, end, n_nodes = get_shape_input_indicies((3,3), self.height)
+        for i in range(start, end):
+             self.labels[i] += " input"
+             
+        start, end, n_nodes = get_shape_output_indices((3,3), self.height)
+        for i in range(start, end):
+             self.labels[i] += " output"
+        
+        
             
         labels = {x : self.labels[x] for x in range(self.n_nodes)}
         nx.draw_networkx(graph, with_labels=True, labels = labels)
-    def vectorise_input(self, x, input_data):
+        
+
+    def vectorise_input(self, x, input_data, shapes):
         
         vectorized_input = self.input_vectorizer(input_data)
         mask = torch.zeros_like(x).to(self.cuda_device)
         
+        # for i in range(mask.shape[0]//self.n_nodes):
+        #     mask[
+        #             self.n_non_io_nodes+(i*self.n_nodes):self.n_non_io_nodes+self.n_outputs+(i*self.n_nodes), :self.input_vector_size
+        #         ] = vectorized_input[i]
+        i = 0
+        vec_index = 0
         
-        for i in range(mask.shape[0]//self.n_nodes):
+        for index, shape in enumerate(shapes):
+            start, end, n_nodes = get_shape_input_indicies(shape, self.height)
             mask[
-                    self.n_non_io_nodes+(i*self.n_nodes):self.n_non_io_nodes+self.n_outputs+(i*self.n_nodes), :self.input_vector_size
-                ] = vectorized_input[i]
-        
+                i + start: i + end, :self.input_vector_size 
+            ] = vectorized_input[index + end - start]
+            vec_index += end - start
+            i += n_nodes
         
         # print(x.shape)
-        # print(x)
         
         x = x + mask
-        # print(x)
         return x
             
-    def vectorize_output(self, x, input_data):
+    def vectorize_output(self, x, input_data, shapes):
+        
         vectorized_output = self.reverse_output_vectorizer(input_data)
         mask = torch.zeros_like(x).to(self.cuda_device)
-        for i in range(mask.shape[0]//self.n_nodes):
-            mask[
-                    (self.n_non_io_nodes) + self.n_outputs + (i*self.n_nodes): self.n_nodes + (i*self.n_nodes), :self.input_vector_size
-                ] = vectorized_output[i]
-            
         
+        # for i in range(mask.shape[0]//self.n_nodes):
+        #     mask[
+        #             (self.n_non_io_nodes) + self.n_outputs + (i*self.n_nodes): self.n_nodes + (i*self.n_nodes), :self.input_vector_size
+        #         ] = vectorized_output[i]
+        i = 0
+        vec_index = 0
+        for  shape in shapes:
+            start, end, n_nodes = get_shape_output_indices(shape, self.height)
+            mask[
+                i + start: i + end, :self.input_vector_size 
+            ] = vectorized_output[vec_index: vec_index + end - start]
+            vec_index += end - start
+            i += n_nodes
         x = x + mask
         return x
     
     def forward(
-        self, x, n_steps, data, return_all = True, edge_attr = None, edge_index = None, last_idx = 1, batch=None
+        self, n_steps, data, return_all = True, edge_attr = None, last_idx = 1, batch=None
     ):
         network_in = []
         network_out = []
-        for idx, (problem_data_x, problem_data_y, metadata) in enumerate(data):
+        x = None
+        
+        for idx, (problem_data_x, problem_data_y, shapes) in enumerate(data):
+            edge_index, initial_state = self.get_batch_edge_index(shapes)
+            if x is None:
+                x = initial_state
             last = idx == last_idx
             
             # last = idx == len(data) - 1
             # print(problem_data_x, problem_data_y)
             # problem_data_y = torch.concat((problem_data_y,problem_data_y), 0)
             problem_data_y_ = problem_data_y.float()#.unsqueeze(-1) 
-            problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)[:,:,:1]), dim = 2)
+            problem_data_y_ = torch.cat((problem_data_y_, torch.ones_like(problem_data_y_)[:,:1]), dim = 1)
             input_data = problem_data_x.float()#.unsqueeze(-1)
             # print(input_data, problem_data_y_)
             
@@ -299,11 +329,11 @@ class UpdateRule(torch.nn.Module):
                 problem_data_y_ = torch.zeros_like(problem_data_y_)
                 
             if not last:
-                x = self.vectorize_output(x, problem_data_y_)
+                x = self.vectorize_output(x, problem_data_y_, shapes)
             else:
-                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_).to(self.cuda_device))
+                x = self.vectorize_output(x, torch.zeros_like(problem_data_y_).to(self.cuda_device), shapes)
             
-            x = self.vectorise_input(x, input_data)
+            x = self.vectorise_input(x, input_data, shapes)
             for _ in range(n_steps):
                 
                 #this makes a big difference when increasing last_idx
@@ -313,12 +343,13 @@ class UpdateRule(torch.nn.Module):
                 else:
                     x = torch.cat((torch.ones([x.shape[0], 1]).to(self.cuda_device), x), dim = 1)
                     x = torch.cat((torch.zeros([x.shape[0], 1]).to(self.cuda_device), x), dim = 1)
+                
                 x = self.step(x, edge_attr=edge_attr, edge_index=edge_index, batch=batch)
             
             if last:
                 break
 
-        network_output = self.get_output(x)
+        network_output = self.get_output(x, shapes)
         
         # loss = F.binary_cross_entropy_with_logits(network_output, problem_data_y.float())
         
@@ -333,7 +364,7 @@ class UpdateRule(torch.nn.Module):
                 network_output.cpu().detach().numpy(),
                 problem_data_y.cpu().float().numpy(), 
                 np.array(network_out),
-                metadata
+                None
             )
         
         return x
@@ -356,32 +387,36 @@ class UpdateRule(torch.nn.Module):
         
         return x
     
-    def get_output(self, x, softmax=True):
+    def get_output(self, x, shapes, softmax=True):
         """
         Returns last n_outputs nodes in x
         Args:
             x: Network state after rule application
         """
         
-        # output = self.output_vectorizer(x[-self.n_outputs:, :self.hidden_dim]).squeeze(-1)
-        # output = self.output_vectorizer(x[-self.n_outputs:, :3]).squeeze(-1)
-        # print(x)
         outputs = []
-        for i in range(x.shape[0]//self.n_nodes):
+        # for i in range(x.shape[0]//self.n_nodes):
+        #     outputs.append(
+        #         self.output_vectorizer
+        #         (
+        #         x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :self.input_vector_size]
+        #     ).squeeze(-1))
+        
+        
+        i = 0
+        for shape in shapes:
+            start, end, n_nodes = get_shape_output_indices(shape, self.height)
             outputs.append(
-                self.output_vectorizer
-                (
-                x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :self.input_vector_size]
-            ).squeeze(-1))
+                self.output_vectorizer(
+                    x[i + start: i + end, :self.input_vector_size ]
+                ).squeeze(-1))
+            i += n_nodes
         
-        
-        output = torch.stack(outputs)
+        output = torch.concat(outputs)
         
         if softmax:
             output = output.softmax(-1)
-        # print(output)
-        
-        # print(x[self.n_non_io_nodes + self.n_inputs + (i*self.n_nodes):self.n_nodes + (i*self.n_nodes), :3])
+            
         return output#.squeeze(0)
         
     

@@ -190,12 +190,18 @@ class D():
         if self.shuffle:
             datasets_in_batch = [d.shuffle() for d in datasets_in_batch]
         
+        
+        metadatas = [d.metadata['shape'] for d in datasets_in_batch]
+        
         #this is borked
         # for x, metadata in zip(zip(*([d.data for d in datasets_in_batch] + [d.target for d in datasets_in_batch])), [d.metadata for d in datasets_in_batch]):
         #     yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):]), metadata
             
+        # for x in zip(*([d.data for d in datasets_in_batch] + [d.target for d in datasets_in_batch])):
+        #     yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):]), None
+            
         for x in zip(*([d.data for d in datasets_in_batch] + [d.target for d in datasets_in_batch])):
-            yield torch.stack(x[0:len(datasets_in_batch)]), torch.stack(x[len(datasets_in_batch):]), None
+            yield torch.concat(x[0:len(datasets_in_batch)]), torch.concat(x[len(datasets_in_batch):]), metadatas
             
     def __len__(self):
         return len(self.datasets)
@@ -217,8 +223,39 @@ class D():
     def n_outputs(self):
         return self.datasets[0].target.shape[1]
     
-def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", print_filenames = False):
-    max_dim = 3
+# def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", print_filenames = False):
+#     max_dim = 3
+#     dataset = []
+
+#     for filename in os.listdir(path):
+#         json_data = json.loads(open(path + filename).read())
+        
+#         if len(json_data['train'][0]['input']) > max_dim or len(json_data['train'][0]['input'][0]) > max_dim:
+#             continue
+        
+#         if len(json_data['train'][0]['output']) > max_dim or len(json_data['train'][0]['output'][0]) > max_dim:
+#             continue
+        
+#         try:
+#             if torch.tensor([x['input'] for x in json_data['train']]).shape[1] != max_dim:
+#                 continue
+            
+#             if torch.tensor([x['output'] for x in json_data['train']]).shape[1] != max_dim:
+#                 continue
+            
+#             if len(json_data['train']) + len(json_data['test']) < 4:
+#                 continue
+#         except:
+#             continue
+        
+#         if print_filenames:
+#             print(filename)
+            
+#         json_data['filename'] = filename
+#         dataset.append(json_data)
+    
+#     return dataset
+def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", print_filenames = False, max_dim = 3, max_length = 3):
     dataset = []
 
     for filename in os.listdir(path):
@@ -231,17 +268,15 @@ def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", pr
             continue
         
         try:
-            if torch.tensor([x['input'] for x in json_data['train']]).shape[1] != max_dim:
-                continue
-            
-            if torch.tensor([x['output'] for x in json_data['train']]).shape[1] != max_dim:
-                continue
-            
-            if len(json_data['train']) + len(json_data['test']) < 4:
-                continue
+            a = torch.tensor([x['input'] for x in json_data['train'] + json_data['test']])#.shape[1]
+            b = torch.tensor([x['output'] for x in json_data['train'] + json_data['test']])#.shape[1]
+            torch.concat([a, b], dim =0)
         except:
             continue
         
+        # if len(json_data['train']) + len(json_data['test']) != max_length:
+        #     continue
+            
         if print_filenames:
             print(filename)
             
@@ -249,7 +284,6 @@ def load_arc(path = r"C:\Users\lmacl\Google Drive\GitHub\ARC\data\training/", pr
         dataset.append(json_data)
     
     return dataset
-
 def process_arc_sample(sample, io, final_dim=3, pad = False, d_len = 4):
     sample = torch.tensor([x[io] for x in sample['train'] + sample['test']])
     if pad:

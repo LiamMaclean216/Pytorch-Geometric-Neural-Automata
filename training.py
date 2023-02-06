@@ -43,31 +43,18 @@ def train_on_meta_set(
     training_params.setdefault("n_epochs", 10000)
     training_params.setdefault("batch_size", 1)
     
-    loader = DataLoader([update_rule.graph]*training_params["batch_size"], batch_size = training_params["batch_size"])
-    graph = loader.__iter__().__next__()
-    graph.batch = graph.batch.to(device)
-    # edge_index = utils.sort_edge_index(graph.edge_index).to(device)
-    # tmp = edge_index[0].clone()
-    # edge_index[0] = edge_index[1]
-    # edge_index[1] = tmp
-    edge_index = update_rule.get_batch_edge_index(batch_size=training_params["batch_size"], n_edge_switches=training_params['n_edge_switches'])
-    
-    if testing_set:
-        edge_index_test = update_rule.get_batch_edge_index(batch_size=testing_set.batch_size, n_edge_switches=0)
-        
     
         
     for epoch in range(starting_epoch, training_params["n_epochs"]):
         update_rule.reset()
-        x = update_rule.initial_state().repeat(training_params["batch_size"], 1)
         x, loss, network_output, correct, network_in, metadata = update_rule.train()(
-            x, training_params["n_steps"], training_set, 
-            edge_attr=edge_attr, edge_index=edge_index, batch=graph.batch, **forward_kwargs
+            training_params["n_steps"], training_set, 
+            edge_attr=edge_attr, **forward_kwargs
         )
         # accuracy = (network_output.argmax(1) == correct.argmax(1)).sum().item() / training_params["batch_size"]
         correct =  correct.argmax(-1)
         network_output = network_output.argmax(-1)
-        accuracy = ((network_output == correct).sum().item() / training_params["batch_size"]) / network_output.shape[1]
+        accuracy = (network_output == correct).mean().item()
         
         
         loss.backward()
@@ -88,14 +75,14 @@ def train_on_meta_set(
             
             x = update_rule.initial_state().repeat(testing_set.batch_size, 1)
             _, test_loss, network_output_, correct_, _, _ = update_rule.eval()(
-                x, training_params["n_steps"], testing_set, batch=update_rule.graph.batch,
-                edge_attr=edge_attr, edge_index=edge_index_test, **forward_kwargs
+                training_params["n_steps"], testing_set,
+                edge_attr=edge_attr, **forward_kwargs
             )
             network_output_ =  network_output_.argmax(-1)
             correct_ = correct_.argmax(-1)
             
             # test_accuracy = (network_output_.argmax(1) == correct_.argmax(1)).sum().item() / network_output.shape[1]
-            test_accuracy = ((network_output_.round() == correct_).sum().item() / testing_set.batch_size) / network_output_.shape[1]
+            test_accuracy = (network_output_.round() == correct_).mean().item()
 
             
             log["test loss"] = test_loss
